@@ -15,7 +15,8 @@ import okhttp3.WebSocketListener
 class TelemetryWebSocket(private val client: OkHttpClient, private val moshi: Moshi) {
 
     fun connect(baseUrl: String): Flow<TelemetryTick> = callbackFlow {
-        val wsUrl = baseUrl.replace("http://", "ws://").replace("https://", "wss://") + "api/ws/live"
+        val cleanBaseUrl = baseUrl.trimEnd('/')
+        val wsUrl = cleanBaseUrl.replace("http://", "ws://").replace("https://", "wss://") + "/api/ws/live"
         val request = Request.Builder().url(wsUrl).build()
         val adapter = moshi.adapter(TelemetryTick::class.java)
 

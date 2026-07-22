@@ -43,6 +43,14 @@ class TelemetryRepository(
         api.getStatus()
     }
 
+    suspend fun getLiveData(): Result<TelemetryTick> = runCatching {
+        api.getLiveData()
+    }
+
+    suspend fun getHistory(limit: Int = 10): Result<List<TelemetryTick>> = runCatching {
+        api.getHistory(limit).history
+    }
+
     suspend fun startSimulation(): Result<Unit> = runCatching {
         api.startSimulation()
     }

@@ -4,6 +4,11 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
+data class HistoryResponse(
+    @Json(name = "history") val history: List<TelemetryTick>
+)
+
+@JsonClass(generateAdapter = true)
 data class TelemetryTick(
     @Json(name = "row_index") val rowIndex: Int,
     @Json(name = "total_rows") val totalRows: Int,

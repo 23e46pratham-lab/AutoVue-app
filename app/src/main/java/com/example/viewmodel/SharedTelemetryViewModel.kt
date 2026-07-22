@@ -12,12 +12,14 @@ import com.example.model.TelemetryTick
 import com.example.repository.ConnectionStatus
 import com.example.repository.TelemetryRepository
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class SharedTelemetryViewModel(
@@ -43,6 +45,15 @@ class SharedTelemetryViewModel(
 
     private val _simulatorStatus = MutableStateFlow<SimulatorStatus?>(null)
     val simulatorStatus = _simulatorStatus.asStateFlow()
+
+    private val _isAnalyzing = MutableStateFlow(false)
+    val isAnalyzing = _isAnalyzing.asStateFlow()
+
+    private val _inferenceError = MutableStateFlow<String?>(null)
+    val inferenceError = _inferenceError.asStateFlow()
+
+    private val _lastInferenceTimestamp = MutableStateFlow<Long?>(null)
+    val lastInferenceTimestamp = _lastInferenceTimestamp.asStateFlow()
 
     private var telemetryJob: Job? = null
     private var lastHealthPredictionTime = 0L
@@ -78,15 +89,69 @@ class SharedTelemetryViewModel(
         }
         
         fetchSimulatorStatus()
+        triggerInference()
+    }
+
+    fun triggerInference() {
+        viewModelScope.launch {
+            _isAnalyzing.value = true
+            _inferenceError.value = null
+
+            try {
+                // Ensure we have history data
+                var historyData = _history.value
+                if (historyData.size < 5) {
+                    val historyResult = repository.getHistory(10)
+                    if (historyResult.isSuccess && !historyResult.getOrNull().isNullOrEmpty()) {
+                        historyData = historyResult.getOrNull()!!
+                        _history.value = historyData
+                    }
+                }
+
+                // Get latest tick either from history or live-data REST call
+                var targetTick = latestTick.value ?: historyData.lastOrNull()
+                if (targetTick == null) {
+                    val liveResult = repository.getLiveData()
+                    if (liveResult.isSuccess) {
+                        targetTick = liveResult.getOrNull()
+                    }
+                }
+
+                if (targetTick != null) {
+                    predictHealth(targetTick)
+                }
+
+                if (historyData.isNotEmpty()) {
+                    predictBehaviour(historyData.takeLast(10))
+                } else if (targetTick != null) {
+                    // Fallback if history is empty: construct a list from targetTick
+                    predictBehaviour(listOf(targetTick, targetTick, targetTick, targetTick, targetTick))
+                }
+
+                if (_healthPrediction.value == null && _driverBehaviour.value == null) {
+                    _inferenceError.value = "Failed to obtain ML predictions. Make sure the backend server is reachable."
+                } else {
+                    _lastInferenceTimestamp.value = System.currentTimeMillis()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _inferenceError.value = "Inference error: ${e.localizedMessage ?: "Network error"}"
+            } finally {
+                _isAnalyzing.value = false
+            }
+        }
     }
 
     private fun startObserving() {
         telemetryJob?.cancel()
         telemetryJob = viewModelScope.launch {
-            try {
-                repository.observeTelemetry().collectLatest { }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            while (isActive) {
+                try {
+                    repository.observeTelemetry().collectLatest { }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                delay(3000)
             }
         }
     }
@@ -103,6 +168,7 @@ class SharedTelemetryViewModel(
     fun startSimulation() {
         viewModelScope.launch {
             repository.startSimulation()
+            startObserving()
             fetchSimulatorStatus()
         }
     }
@@ -110,8 +176,9 @@ class SharedTelemetryViewModel(
     fun pingBackend() {
         viewModelScope.launch {
             repository.pingBackend()
-            // After pinging, we could check status or let websocket retry
+            startObserving()
             fetchSimulatorStatus()
+            triggerInference()
         }
     }
 
