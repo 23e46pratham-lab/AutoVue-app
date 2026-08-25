@@ -4,12 +4,13 @@ AutoVue is an advanced Android application built to provide real-time vehicle te
 
 ## Key Features
 
-- **Live Dashboard**: Real-time streaming of OBD-II telemetry parameters (Engine Load, Coolant Temp, Intake Temp, MAP, MAF, and Pedal positions) via WebSockets.
+- **Live Dashboard**: Real-time streaming of OBD-II telemetry parameters. Features a custom Analog Instrument Cluster displaying Speed, RPM, and Coolant Temperature alongside digital metrics.
 - **AI Insights**:
   - **Driver Behavior Analysis**: Utilizes a rolling window of telemetry data and a pre-trained KMeans clustering model to classify driving patterns.
   - **Vehicle Health Prediction**: Leverages a Random Forest model on single telemetry snapshots to evaluate overall vehicle health and output probability confidences.
-- **Maintenance Tracking**: (Upcoming) A dedicated module for tracking vehicle maintenance needs.
-- **Server Management**: Built-in mechanisms to manage and ping the remote Render-hosted backend instance for cold-start wakeups.
+- **Maintenance Portal**: A dedicated module for tracking vehicle maintenance needs. Features ECU Trouble Code decoding, manual/automatic fault ticket registration, and integration placeholders for dispatching tickets to service partners or Telegram gateways.
+- **Voice Alerts (TTS)**: Integrated Android Text-to-Speech (TTS) engine to vocalize critical warnings (e.g., speeding, high RPM, or engine overheating) directly to the driver, configurable via the Settings tab.
+- **User & System Configuration**: Manage driver profiles, vehicle models, TTS preferences, and ping the remote Render-hosted backend instance for cold-start wakeups.
 
 ## Architecture & Tech Stack
 

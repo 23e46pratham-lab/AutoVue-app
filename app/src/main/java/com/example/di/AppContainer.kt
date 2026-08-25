@@ -48,5 +48,6 @@ class AppContainer(private val context: Context) {
     val api: AutoVueApi = retrofit.create(AutoVueApi::class.java)
     val webSocket = TelemetryWebSocket(okHttpClient, moshi)
     
+    val ttsManager = com.example.utils.TtsManager(context)
     val telemetryRepository = TelemetryRepository(api, webSocket, baseUrl)
 }

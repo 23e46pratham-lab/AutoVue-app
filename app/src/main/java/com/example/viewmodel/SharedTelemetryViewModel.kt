@@ -7,8 +7,11 @@ import com.example.model.DriverBehaviourRequest
 import com.example.model.DriverBehaviourResponse
 import com.example.model.HealthPredictionRequest
 import com.example.model.HealthPredictionResponse
+import com.example.model.ServiceTicket
 import com.example.model.SimulatorStatus
 import com.example.model.TelemetryTick
+import com.example.model.TicketStatus
+import com.example.model.UrgencyLevel
 import com.example.repository.ConnectionStatus
 import com.example.repository.TelemetryRepository
 import kotlinx.coroutines.Job
@@ -21,9 +24,13 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SharedTelemetryViewModel(
-    private val repository: TelemetryRepository
+    private val repository: TelemetryRepository,
+    private val ttsManager: com.example.utils.TtsManager
 ) : ViewModel() {
 
     val connectionStatus = repository.connectionStatus
@@ -55,15 +62,38 @@ class SharedTelemetryViewModel(
     private val _lastInferenceTimestamp = MutableStateFlow<Long?>(null)
     val lastInferenceTimestamp = _lastInferenceTimestamp.asStateFlow()
 
+    private val _tickets = MutableStateFlow<List<ServiceTicket>>(emptyList())
+    val tickets = _tickets.asStateFlow()
+
+    private val _isTransmittingTicket = MutableStateFlow(false)
+    val isTransmittingTicket = _isTransmittingTicket.asStateFlow()
+
+    private val _telegramGatewayEnabled = MutableStateFlow(false)
+    val telegramGatewayEnabled = _telegramGatewayEnabled.asStateFlow()
+
+    private val _voiceAlertsEnabled = MutableStateFlow(true)
+    val voiceAlertsEnabled = _voiceAlertsEnabled.asStateFlow()
+
+    private val _userName = MutableStateFlow("John Doe")
+    val userName = _userName.asStateFlow()
+
+    private val _vehicleModel = MutableStateFlow("2024 Apex GT")
+    val vehicleModel = _vehicleModel.asStateFlow()
+
     private var telemetryJob: Job? = null
+    private var pollingJob: Job? = null
+    private var lastTickTimestamp = 0L
     private var lastHealthPredictionTime = 0L
     private var lastBehaviourPredictionTime = 0L
+    private var lastVoiceAlertTime = 0L
 
     init {
         startObserving()
+        startPollingFallback()
         viewModelScope.launch {
             repository.latestTick.collectLatest { tick ->
                 if (tick != null) {
+                    lastTickTimestamp = System.currentTimeMillis()
                     val currentHistory = _history.value.toMutableList()
                     currentHistory.add(tick)
                     // Keep max 300 items for 5 mins of 1 tick/sec (assuming 1 tick/sec)
@@ -84,12 +114,49 @@ class SharedTelemetryViewModel(
                         lastBehaviourPredictionTime = now
                         predictBehaviour(currentHistory.takeLast(10))
                     }
+
+                    checkAndSpeakAlerts(tick)
                 }
             }
         }
         
         fetchSimulatorStatus()
         triggerInference()
+    }
+
+    private fun checkAndSpeakAlerts(tick: TelemetryTick) {
+        if (!_voiceAlertsEnabled.value) return
+        
+        val now = System.currentTimeMillis()
+        if (now - lastVoiceAlertTime < 15000) return // Debounce alerts
+
+        val d = tick.data
+        var alertMsg: String? = null
+        
+        if (d.vss > 120) {
+            alertMsg = "Warning: Speed limit exceeded. Current speed is ${d.vss.toInt()} kilometers per hour."
+        } else if (d.rpm > 6000) {
+            alertMsg = "Warning: High engine RPM detected. RPM is at ${d.rpm.toInt()}."
+        } else if (d.coolantTemp > 100) {
+            alertMsg = "Critical Warning: Engine coolant temperature is too high. Please pull over safely."
+        }
+        
+        if (alertMsg != null) {
+            ttsManager.speak(alertMsg)
+            lastVoiceAlertTime = now
+        }
+    }
+
+    fun toggleVoiceAlerts(enabled: Boolean) {
+        _voiceAlertsEnabled.value = enabled
+    }
+
+    fun updateUserName(name: String) {
+        _userName.value = name
+    }
+
+    fun updateVehicleModel(model: String) {
+        _vehicleModel.value = model
     }
 
     fun triggerInference() {
@@ -156,6 +223,26 @@ class SharedTelemetryViewModel(
         }
     }
 
+    private fun startPollingFallback() {
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch {
+            while (isActive) {
+                val now = System.currentTimeMillis()
+                // If we haven't received a tick in the last 1200ms, fetch via REST polling
+                if (now - lastTickTimestamp > 1200) {
+                    val result = repository.getLiveData()
+                    if (result.isSuccess && result.getOrNull() != null) {
+                        lastTickTimestamp = System.currentTimeMillis()
+                    } else {
+                        // Backend might be sleeping or simulator paused; attempt start
+                        repository.startSimulation()
+                    }
+                }
+                delay(1000)
+            }
+        }
+    }
+
     private fun fetchSimulatorStatus() {
         viewModelScope.launch {
             val result = repository.getStatus()
@@ -215,12 +302,52 @@ class SharedTelemetryViewModel(
         }
     }
 
+    fun submitServiceTicket(
+        faultCode: String,
+        description: String,
+        urgency: UrgencyLevel,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            _isTransmittingTicket.value = true
+            delay(1000) // Simulate transmission delay over secure ECU channel
+            val timeString = SimpleDateFormat("HH:mm:ss - MMM dd", Locale.getDefault()).format(Date())
+            val randomId = "TCK-${(1000..9999).random()}"
+            val newTicket = ServiceTicket(
+                id = randomId,
+                timestamp = timeString,
+                faultCode = if (faultCode.isBlank()) "No DTC (Custom Issue)" else faultCode,
+                description = description,
+                urgency = urgency,
+                servicePartner = "Apex Auto Services",
+                status = TicketStatus.TRANSMITTED
+            )
+            _tickets.value = listOf(newTicket) + _tickets.value
+            _isTransmittingTicket.value = false
+            onSuccess()
+        }
+    }
+
+    fun toggleTelegramGateway(enabled: Boolean) {
+        _telegramGatewayEnabled.value = enabled
+    }
+
+    fun resolveTicket(ticketId: String) {
+        _tickets.value = _tickets.value.map {
+            if (it.id == ticketId) it.copy(status = TicketStatus.RESOLVED) else it
+        }
+    }
+
+    fun deleteTicket(ticketId: String) {
+        _tickets.value = _tickets.value.filterNot { it.id == ticketId }
+    }
+
     companion object {
-        fun provideFactory(repository: TelemetryRepository): ViewModelProvider.Factory =
+        fun provideFactory(repository: TelemetryRepository, ttsManager: com.example.utils.TtsManager): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                    return SharedTelemetryViewModel(repository) as T
+                    return SharedTelemetryViewModel(repository, ttsManager) as T
                 }
             }
     }

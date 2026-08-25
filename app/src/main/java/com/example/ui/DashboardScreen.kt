@@ -42,10 +42,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.components.AnalogGauge
 import com.example.components.CircularGauge
 import com.example.components.ValueCard
 import com.example.repository.ConnectionStatus
 import com.example.ui.theme.Amber400
+import com.example.ui.theme.CardBorder
 import com.example.ui.theme.Emerald400
 import com.example.ui.theme.Emerald500
 import com.example.ui.theme.Indigo400
@@ -103,6 +105,15 @@ fun DashboardScreen(viewModel: SharedTelemetryViewModel) {
                     )
                 }
             }
+
+            if (status != ConnectionStatus.CONNECTED) {
+                Button(
+                    onClick = { viewModel.pingBackend() },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Reconnect", fontSize = 12.sp)
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -120,46 +131,67 @@ fun DashboardScreen(viewModel: SharedTelemetryViewModel) {
             pedalE = 0.0
         )
             
-        // Primary Gauge Section
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+        // Primary Analog Instrument Cluster (RPM, Speedometer in Center, Coolant)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            border = BorderStroke(1.dp, CardBorder)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp, horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                CircularGauge(
+                // Analog Tachometer (RPM Meter - Left)
+                AnalogGauge(
+                    title = "RPM",
+                    value = data.rpm.toFloat(),
+                    maxValue = 8000f,
+                    unit = "rpm",
+                    majorStep = 2000f,
+                    minorDivisions = 2,
+                    redlineStart = 6000f,
+                    gaugeColor = if (data.rpm > 6000) StatusRed else Emerald500,
+                    needleColor = Color(0xFFFF9100),
+                    valueTextOverride = "%.0f".format(data.rpm),
+                    tickLabelFormatter = { (it / 1000f).toInt().toString() },
+                    modifier = Modifier.weight(0.9f)
+                )
+
+                // Analog Speedometer (Center - Larger)
+                AnalogGauge(
                     title = "Speed",
                     value = data.vss.toFloat(),
                     maxValue = 240f,
                     unit = "km/h",
-                    modifier = Modifier.size(220.dp),
-                    color = if (data.vss > 120) StatusRed else Indigo500
+                    majorStep = 30f,
+                    minorDivisions = 2,
+                    redlineStart = 160f,
+                    gaugeColor = if (data.vss > 120) StatusRed else Indigo500,
+                    needleColor = Color(0xFFFF3D00),
+                    modifier = Modifier.weight(1.25f)
                 )
-                
-                // RPM floating bar
-                Column(
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("RPM", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .width(6.dp)
-                            .height(100.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Slate800),
-                        contentAlignment = Alignment.BottomCenter
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight(fraction = (data.rpm / 8000.0).toFloat().coerceIn(0f, 1f))
-                                .background(Indigo500)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("${"%.1f".format(data.rpm / 1000.0)}k", style = MaterialTheme.typography.labelSmall, color = Indigo400, fontFamily = MaterialTheme.typography.displayLarge.fontFamily)
-                }
+
+                // Analog Coolant Gauge (Temp Meter - Right)
+                AnalogGauge(
+                    title = "Coolant",
+                    value = data.coolantTemp.toFloat(),
+                    maxValue = 130f,
+                    unit = "°C",
+                    majorStep = 30f,
+                    minorDivisions = 2,
+                    redlineStart = 100f,
+                    gaugeColor = if (data.coolantTemp > 100) StatusRed else Amber400,
+                    needleColor = Color(0xFF00E676),
+                    valueTextOverride = "%.0f".format(data.coolantTemp),
+                    tickLabelFormatter = { it.toInt().toString() },
+                    modifier = Modifier.weight(0.9f)
+                )
             }
+        }
             
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -235,72 +267,6 @@ fun DashboardScreen(viewModel: SharedTelemetryViewModel) {
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // AI Health Insights Card
-            val healthGradient = Brush.linearGradient(
-                colors = listOf(Indigo900.copy(alpha = 0.4f), MaterialTheme.colorScheme.surface)
-            )
-            
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.2f)),
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-            ) {
-                Box(modifier = Modifier.background(healthGradient).padding(16.dp)) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Indigo500.copy(alpha = 0.2f)).padding(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = Indigo400,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text("HEALTH AI PREDICTION", style = MaterialTheme.typography.labelSmall, color = Indigo400, fontWeight = FontWeight.Bold)
-                                    Text(health?.status ?: "Evaluating System...", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-                            
-                            if (health != null) {
-                                Box(modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Indigo500).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                    Text("${"%.0f".format(health!!.confidence * 100)}% CONF.", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Black, fontSize = 9.sp)
-                                }
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (health != null && health!!.status == "Normal") "No immediate mechanical issues detected. Maintenance recommended in 2,450 km." else "Waiting for enough telemetry data to perform a reliable health prediction.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 16.sp
-                        )
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        val confidence = health?.confidence?.toFloat() ?: 0f
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(Indigo500.copy(alpha = 0.2f))
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth(fraction = confidence).height(6.dp).background(Indigo500)
-                            )
-                        }
-                    }
                 }
             }
             

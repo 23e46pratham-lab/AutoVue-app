@@ -44,7 +44,10 @@ class TelemetryRepository(
     }
 
     suspend fun getLiveData(): Result<TelemetryTick> = runCatching {
-        api.getLiveData()
+        val tick = api.getLiveData()
+        _latestTick.value = tick
+        _connectionStatus.value = ConnectionStatus.CONNECTED
+        tick
     }
 
     suspend fun getHistory(limit: Int = 10): Result<List<TelemetryTick>> = runCatching {

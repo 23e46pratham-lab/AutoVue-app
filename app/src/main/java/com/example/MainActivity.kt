@@ -25,7 +25,10 @@ class MainActivity : ComponentActivity() {
           color = MaterialTheme.colorScheme.background
         ) {
           val viewModel: SharedTelemetryViewModel = viewModel(
-            factory = SharedTelemetryViewModel.provideFactory(appContainer.telemetryRepository)
+            factory = SharedTelemetryViewModel.provideFactory(
+                appContainer.telemetryRepository,
+                appContainer.ttsManager
+            )
           )
           AutoVueNavGraph(viewModel = viewModel)
         }
