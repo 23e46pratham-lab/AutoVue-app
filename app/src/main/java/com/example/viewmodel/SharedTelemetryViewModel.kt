@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -79,6 +80,12 @@ class SharedTelemetryViewModel(
     private val _voiceAlertsEnabled = MutableStateFlow(true)
     val voiceAlertsEnabled = _voiceAlertsEnabled.asStateFlow()
 
+    private val _visualAlertsEnabled = MutableStateFlow(true)
+    val visualAlertsEnabled = _visualAlertsEnabled.asStateFlow()
+
+    private val _visualAlertEvent = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val visualAlertEvent = _visualAlertEvent.asSharedFlow()
+
     private val _userName = MutableStateFlow("John Doe")
     val userName = _userName.asStateFlow()
 
@@ -131,7 +138,7 @@ class SharedTelemetryViewModel(
     }
 
     private fun checkAndSpeakAlerts(tick: TelemetryTick) {
-        if (!_voiceAlertsEnabled.value) return
+        if (!_voiceAlertsEnabled.value && !_visualAlertsEnabled.value) return
         
         val now = System.currentTimeMillis()
         if (now - lastVoiceAlertTime < 15000) return // Debounce alerts
@@ -148,13 +155,22 @@ class SharedTelemetryViewModel(
         }
         
         if (alertMsg != null) {
-            ttsManager.speak(alertMsg)
+            if (_voiceAlertsEnabled.value) {
+                ttsManager.speak(alertMsg)
+            }
+            if (_visualAlertsEnabled.value) {
+                _visualAlertEvent.tryEmit(alertMsg)
+            }
             lastVoiceAlertTime = now
         }
     }
 
     fun toggleVoiceAlerts(enabled: Boolean) {
         _voiceAlertsEnabled.value = enabled
+    }
+
+    fun toggleVisualAlerts(enabled: Boolean) {
+        _visualAlertsEnabled.value = enabled
     }
 
     fun updateUserName(name: String) {

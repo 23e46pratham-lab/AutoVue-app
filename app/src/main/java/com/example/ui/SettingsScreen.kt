@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
@@ -63,6 +64,7 @@ import com.example.viewmodel.SharedTelemetryViewModel
 fun SettingsScreen(viewModel: SharedTelemetryViewModel) {
     val status by viewModel.simulatorStatus.collectAsState()
     val voiceAlertsEnabled by viewModel.voiceAlertsEnabled.collectAsState()
+    val visualAlertsEnabled by viewModel.visualAlertsEnabled.collectAsState()
     val userName by viewModel.userName.collectAsState()
     val vehicleModel by viewModel.vehicleModel.collectAsState()
     val availableDatasets by viewModel.availableDatasets.collectAsState()
@@ -181,6 +183,45 @@ fun SettingsScreen(viewModel: SharedTelemetryViewModel) {
 
                 Text(
                     text = "When enabled, critical vehicle parameters (e.g., high speed, excessive RPM, or overheating coolant) will be spoken aloud to the driver.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = "Visual Popup",
+                            tint = if (visualAlertsEnabled) Emerald400 else Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "VISUAL POP-UP ALERTS",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Switch(
+                        checked = visualAlertsEnabled,
+                        onCheckedChange = { viewModel.toggleVisualAlerts(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Emerald400)
+                    )
+                }
+
+                Text(
+                    text = "When enabled, critical vehicle parameters will trigger a short text pop-up on the screen.",
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

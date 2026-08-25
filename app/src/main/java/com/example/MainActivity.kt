@@ -30,6 +30,14 @@ class MainActivity : ComponentActivity() {
                 appContainer.ttsManager
             )
           )
+          
+          val context = androidx.compose.ui.platform.LocalContext.current
+          androidx.compose.runtime.LaunchedEffect(viewModel.visualAlertEvent) {
+              viewModel.visualAlertEvent.collect { alertMessage ->
+                  android.widget.Toast.makeText(context, alertMessage, android.widget.Toast.LENGTH_SHORT).show()
+              }
+          }
+          
           AutoVueNavGraph(viewModel = viewModel)
         }
       }
