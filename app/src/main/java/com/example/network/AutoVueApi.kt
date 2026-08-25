@@ -33,6 +33,23 @@ interface AutoVueApi {
     
     @POST("api/pause")
     suspend fun pauseSimulation()
+
+    @POST("api/resume")
+    suspend fun resumeSimulation()
+
+    @POST("api/stop")
+    suspend fun stopSimulation()
+
+    @GET("api/datasets")
+    suspend fun getDatasets(): com.example.model.DatasetListResponse
+
+    @POST("api/change-dataset")
+    suspend fun changeDataset(@Body request: com.example.model.ChangeDatasetRequest)
+
+    @retrofit2.http.Multipart
+    @POST("api/upload")
+    suspend fun uploadDataset(@retrofit2.http.Part file: okhttp3.MultipartBody.Part): Any
+
     @GET("health")
     suspend fun pingHealth(): Any
 }

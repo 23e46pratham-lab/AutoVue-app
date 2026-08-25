@@ -1,5 +1,8 @@
 package com.example.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,14 +17,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -31,6 +44,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,13 +58,24 @@ import com.example.ui.theme.Indigo400
 import com.example.ui.theme.Indigo500
 import com.example.viewmodel.SharedTelemetryViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: SharedTelemetryViewModel) {
     val status by viewModel.simulatorStatus.collectAsState()
     val voiceAlertsEnabled by viewModel.voiceAlertsEnabled.collectAsState()
     val userName by viewModel.userName.collectAsState()
     val vehicleModel by viewModel.vehicleModel.collectAsState()
+    val availableDatasets by viewModel.availableDatasets.collectAsState()
     
+    var datasetMenuExpanded by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    
+    val context = LocalContext.current
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.uploadDataset(context, it) }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -193,8 +220,74 @@ fun SettingsScreen(viewModel: SharedTelemetryViewModel) {
                 if (status != null) {
                     val s = status!!
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        
+                        ExposedDropdownMenuBox(
+                            expanded = datasetMenuExpanded,
+                            onExpandedChange = { datasetMenuExpanded = !datasetMenuExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = s.datasetName ?: "Select Dataset",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Active Dataset") },
+                                trailingIcon = {
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
+                                },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Indigo400)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = datasetMenuExpanded,
+                                onDismissRequest = { datasetMenuExpanded = false }
+                            ) {
+                                availableDatasets.forEach { dataset ->
+                                    DropdownMenuItem(
+                                        text = { Text(dataset.filename) },
+                                        onClick = {
+                                            viewModel.changeDataset(dataset.datasetId)
+                                            datasetMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            if (s.state == "running") {
+                                IconButton(onClick = { viewModel.pauseSimulation() }) {
+                                    Icon(Icons.Default.Pause, contentDescription = "Pause", tint = Indigo400)
+                                }
+                            } else if (s.state == "paused") {
+                                IconButton(onClick = { viewModel.resumeSimulation() }) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Resume", tint = Emerald400)
+                                }
+                            } else {
+                                IconButton(onClick = { viewModel.startSimulation() }) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = Emerald400)
+                                }
+                            }
+                            
+                            IconButton(onClick = { viewModel.stopSimulation() }) {
+                                Icon(Icons.Default.Stop, contentDescription = "Stop", tint = MaterialTheme.colorScheme.error)
+                            }
+                            
+                            IconButton(onClick = { filePickerLauncher.launch("*/*") }) {
+                                Icon(Icons.Default.Upload, contentDescription = "Upload Dataset", tint = Indigo400)
+                            }
+                            
+                            IconButton(onClick = { viewModel.fetchDatasets() }) {
+                                Icon(Icons.Default.Sync, contentDescription = "Refresh", tint = Indigo400)
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text("State: ${s.state}", style = MaterialTheme.typography.bodyMedium)
-                        Text("Dataset: ${s.datasetName}", style = MaterialTheme.typography.bodyMedium)
                         Text("Speed: ${s.speed}x", style = MaterialTheme.typography.bodyMedium)
                         Text("Progress: ${"%.1f".format(s.playbackPercent)}%", style = MaterialTheme.typography.bodyMedium)
                     }

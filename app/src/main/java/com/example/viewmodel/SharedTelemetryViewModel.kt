@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -52,6 +54,9 @@ class SharedTelemetryViewModel(
 
     private val _simulatorStatus = MutableStateFlow<SimulatorStatus?>(null)
     val simulatorStatus = _simulatorStatus.asStateFlow()
+
+    private val _availableDatasets = MutableStateFlow<List<com.example.model.DatasetInfo>>(emptyList())
+    val availableDatasets = _availableDatasets.asStateFlow()
 
     private val _isAnalyzing = MutableStateFlow(false)
     val isAnalyzing = _isAnalyzing.asStateFlow()
@@ -121,6 +126,7 @@ class SharedTelemetryViewModel(
         }
         
         fetchSimulatorStatus()
+        fetchDatasets()
         triggerInference()
     }
 
@@ -243,6 +249,15 @@ class SharedTelemetryViewModel(
         }
     }
 
+    fun fetchDatasets() {
+        viewModelScope.launch {
+            val result = repository.getDatasets()
+            if (result.isSuccess) {
+                _availableDatasets.value = result.getOrNull()?.datasets ?: emptyList()
+            }
+        }
+    }
+
     private fun fetchSimulatorStatus() {
         viewModelScope.launch {
             val result = repository.getStatus()
@@ -260,11 +275,71 @@ class SharedTelemetryViewModel(
         }
     }
 
+    fun pauseSimulation() {
+        viewModelScope.launch {
+            repository.pauseSimulation()
+            fetchSimulatorStatus()
+        }
+    }
+
+    fun resumeSimulation() {
+        viewModelScope.launch {
+            repository.resumeSimulation()
+            fetchSimulatorStatus()
+        }
+    }
+
+    fun stopSimulation() {
+        viewModelScope.launch {
+            repository.stopSimulation()
+            fetchSimulatorStatus()
+        }
+    }
+
+    fun changeDataset(datasetId: String) {
+        viewModelScope.launch {
+            repository.changeDataset(datasetId)
+            fetchSimulatorStatus()
+        }
+    }
+
+    fun uploadDataset(context: android.content.Context, uri: android.net.Uri) {
+        viewModelScope.launch {
+            try {
+                val contentResolver = context.contentResolver
+                var fileName = "uploaded_dataset.csv"
+                contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1) {
+                            fileName = cursor.getString(nameIndex)
+                        }
+                    }
+                }
+
+                val inputStream = contentResolver.openInputStream(uri)
+                val bytes = inputStream?.readBytes() ?: return@launch
+                
+                val mediaType = "multipart/form-data".toMediaTypeOrNull()
+                val requestBody = bytes.toRequestBody(mediaType)
+                val part = okhttp3.MultipartBody.Part.createFormData("file", fileName, requestBody)
+                
+                val result = repository.uploadDataset(part)
+                if (result.isSuccess) {
+                    fetchDatasets()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     fun pingBackend() {
         viewModelScope.launch {
             repository.pingBackend()
             startObserving()
             fetchSimulatorStatus()
+            fetchDatasets()
             triggerInference()
         }
     }

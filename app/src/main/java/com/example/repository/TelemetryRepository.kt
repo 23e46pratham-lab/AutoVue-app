@@ -58,6 +58,30 @@ class TelemetryRepository(
         api.startSimulation()
     }
 
+    suspend fun pauseSimulation(): Result<Unit> = runCatching {
+        api.pauseSimulation()
+    }
+
+    suspend fun resumeSimulation(): Result<Unit> = runCatching {
+        api.resumeSimulation()
+    }
+
+    suspend fun stopSimulation(): Result<Unit> = runCatching {
+        api.stopSimulation()
+    }
+
+    suspend fun getDatasets(): Result<com.example.model.DatasetListResponse> = runCatching {
+        api.getDatasets()
+    }
+
+    suspend fun changeDataset(datasetId: String): Result<Unit> = runCatching {
+        api.changeDataset(com.example.model.ChangeDatasetRequest(datasetId))
+    }
+
+    suspend fun uploadDataset(file: okhttp3.MultipartBody.Part): Result<Any> = runCatching {
+        api.uploadDataset(file)
+    }
+
     suspend fun predictHealth(request: HealthPredictionRequest): Result<HealthPredictionResponse> = runCatching {
         api.predictHealth(request)
     }
