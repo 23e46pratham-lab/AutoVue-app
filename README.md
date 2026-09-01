@@ -5,6 +5,7 @@ AutoVue is an advanced Android application built to provide real-time vehicle te
 ## Key Features
 
 - **Live Dashboard**: Real-time streaming of OBD-II telemetry parameters. Features a custom Analog Instrument Cluster displaying Speed, RPM, and Coolant Temperature alongside digital metrics.
+- **Engine Data Visualisation (Oscilloscope Graphs)**: Dedicated real-time data visualization tab styled after professional automotive diagnostic oscilloscopes. Features live scrolling multi-point line graphs for RPM, Speed, Intake Air Temp, Calculated Load, Coolant Temp, MAP, MAF, Ambient Temp, and Accelerator Pedals, along with the cluster overview and top-bar playback controls.
 - **AI Insights**:
   - **Driver Behavior Analysis**: Utilizes a rolling window of telemetry data and a pre-trained KMeans clustering model to classify driving patterns.
   - **Vehicle Health Prediction**: Leverages a Random Forest model on single telemetry snapshots to evaluate overall vehicle health and output probability confidences.

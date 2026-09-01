@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,10 +32,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.example.ui.InsightsScreen
 import com.example.ui.DashboardScreen
+import com.example.ui.InsightsScreen
 import com.example.ui.MaintenanceScreen
 import com.example.ui.SettingsScreen
+import com.example.ui.VisualizationScreen
 import com.example.ui.theme.BottomNavBackground
 import com.example.ui.theme.Indigo400
 import com.example.ui.theme.TextSecondary
@@ -44,6 +46,7 @@ data class BottomNavItem(val name: String, val route: Screen, val icon: ImageVec
 
 val bottomNavItems = listOf(
     BottomNavItem("Dash", Screen.Dashboard, Icons.Default.Dashboard),
+    BottomNavItem("Graphs", Screen.Visualization, Icons.Default.ShowChart),
     BottomNavItem("Insights", Screen.Insights, Icons.Default.Analytics),
     BottomNavItem("Maint", Screen.Maintenance, Icons.Default.Build),
     BottomNavItem("User", Screen.Settings, Icons.Default.Settings)
@@ -102,6 +105,9 @@ fun AutoVueNavGraph(viewModel: SharedTelemetryViewModel) {
         ) {
             composable(Screen.Dashboard.route) {
                 DashboardScreen(viewModel)
+            }
+            composable(Screen.Visualization.route) {
+                VisualizationScreen(viewModel)
             }
             composable(Screen.Insights.route) {
                 InsightsScreen(viewModel)
