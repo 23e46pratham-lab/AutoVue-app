@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.NotificationsOff
@@ -117,6 +119,12 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
     var selectedUrgency by remember { mutableStateOf(UrgencyLevel.MEDIUM) }
     var isFaultDropdownExpanded by remember { mutableStateOf(false) }
 
+    var registerTicketExpanded by remember { mutableStateOf(false) }
+    var servicePartnerExpanded by remember { mutableStateOf(false) }
+    var telegramGatewayExpanded by remember { mutableStateOf(false) }
+    var serviceRecordsExpanded by remember { mutableStateOf(false) }
+    var decoderExpanded by remember { mutableStateOf(false) }
+
     // Auto-detect DTC from telemetry if coolant is high or health is abnormal
     val activeFaultWarning = remember(latestTick, healthPrediction) {
         val coolant = latestTick?.data?.coolantTemp ?: 0.0
@@ -144,36 +152,54 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
 
         // Ticket Registration Form
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
             border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.25f))
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Header Title
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { registerTicketExpanded = !registerTicketExpanded }
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = "Ticket",
+                            tint = Color(0xFFFFB74D),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "REGISTER A VEHICLE SERVICE FAULT TICKET",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = "Ticket",
-                        tint = Color(0xFFFFB74D),
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = "REGISTER A VEHICLE SERVICE FAULT TICKET",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        imageVector = if (registerTicketExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                // Active ECU Sensor Status Banner
+                if (registerTicketExpanded) {
+                    Column(
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Active ECU Sensor Status Banner
                 if (activeFaultWarning == null) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -442,41 +468,60 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                         Text("TRANSMIT TICKET TO APEX AUTO SERVICES", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
+                    }
+                }
             }
         }
 
         // Current Service Partner Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
             border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.25f))
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { servicePartnerExpanded = !servicePartnerExpanded }
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Partner",
+                            tint = Indigo400,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "CURRENT SERVICE PARTNER",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Partner",
-                        tint = Indigo400,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "CURRENT SERVICE PARTNER",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        imageVector = if (servicePartnerExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
+                if (servicePartnerExpanded) {
+                    Column(
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
                         text = "COMPANY NAME",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
@@ -529,30 +574,33 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                         Text("FACILITY / DISPATCH CENTER", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = Color.Gray)
                         Text("404 Performance Blvd, Detroit, MI", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
                     }
-                }
 
-                Text(
-                    text = "Need to change mechanic or roadside assistance partner? Update provider records in system configuration.",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
+                    Text(
+                        text = "Need to change mechanic or roadside assistance partner? Update provider records in system configuration.",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                    }
+                }
             }
         }
 
         // Telegram Gateway Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
             border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.25f))
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { telegramGatewayExpanded = !telegramGatewayExpanded }
+                        .padding(18.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -574,14 +622,26 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                         )
                     }
 
-                    Switch(
-                        checked = telegramGatewayEnabled,
-                        onCheckedChange = { viewModel.toggleTelegramGateway(it) },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Emerald400)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Switch(
+                            checked = telegramGatewayEnabled,
+                            onCheckedChange = { viewModel.toggleTelegramGateway(it) },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Emerald400)
+                        )
+                        Icon(
+                            imageVector = if (telegramGatewayExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                Surface(
+                if (telegramGatewayExpanded) {
+                    Column(
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
                     shape = RoundedCornerShape(6.dp),
                     color = if (telegramGatewayEnabled) Color(0xFF1B382B) else Slate800,
                     modifier = Modifier.padding(vertical = 2.dp)
@@ -602,22 +662,26 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                    }
+                }
             }
         }
 
         // Registered Vehicle Service Records Log Section
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateContentSize(),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
             border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.25f))
         ) {
             Column(
-                modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { serviceRecordsExpanded = !serviceRecordsExpanded }
+                        .padding(18.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -628,9 +692,19 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                         letterSpacing = 0.5.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    Icon(
+                        imageVector = if (serviceRecordsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
 
-                if (tickets.isEmpty()) {
+                if (serviceRecordsExpanded) {
+                    Column(
+                        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        if (tickets.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -671,6 +745,8 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                                 onDelete = { viewModel.deleteTicket(ticket.id) }
                             )
                         }
+                    }
+                }
                     }
                 }
             }
@@ -914,36 +990,54 @@ private fun ServiceTicketItem(
 
 @Composable
 private fun EcuTroubleCodesDecoderCard(onAttachCode: (EcuCodeInfo) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().animateContentSize(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
         border = BorderStroke(1.dp, Indigo500.copy(alpha = 0.25f))
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(18.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Decoder",
+                        tint = StatusRed,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "ECU TROUBLE CODES DECODER",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "Decoder",
-                    tint = StatusRed,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    text = "ECU TROUBLE CODES DECODER",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Expand",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                commonEcuCodes.forEach { codeInfo ->
+            if (expanded) {
+                Column(
+                    modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    commonEcuCodes.forEach { codeInfo ->
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surface,
@@ -996,7 +1090,8 @@ private fun EcuTroubleCodesDecoderCard(onAttachCode: (EcuCodeInfo) -> Unit) {
                         }
                     }
                 }
+                    }
+                }
             }
         }
     }
-}
