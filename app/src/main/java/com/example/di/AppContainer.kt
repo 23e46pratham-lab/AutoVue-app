@@ -49,5 +49,5 @@ class AppContainer(private val context: Context) {
     val webSocket = TelemetryWebSocket(okHttpClient, moshi)
     
     val ttsManager = com.example.utils.TtsManager(context)
-    val telemetryRepository = TelemetryRepository(api, webSocket, baseUrl)
+    val telemetryRepository = TelemetryRepository(api, webSocket, baseUrl, moshi)
 }

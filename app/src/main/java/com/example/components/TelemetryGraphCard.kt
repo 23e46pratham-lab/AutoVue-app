@@ -135,7 +135,6 @@ fun TelemetryGraphCard(
                         text = valueFormat.format(currentValue),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
                         color = lineColor,
                         fontSize = 18.sp
                     )

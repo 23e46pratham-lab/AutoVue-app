@@ -16,3 +16,20 @@ data class SimulatorStatus(
     @Json(name = "dataset_duration_seconds") val datasetDurationSeconds: Double,
     @Json(name = "playback_percent") val playbackPercent: Double
 )
+
+@JsonClass(generateAdapter = true)
+data class StartSimulationRequest(
+    @Json(name = "dataset_id") val datasetId: String? = null,
+    @Json(name = "speed") val speed: Double? = null,
+    @Json(name = "loop") val loop: Boolean? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class SpeedRequest(
+    @Json(name = "speed") val speed: Double
+)
+
+@JsonClass(generateAdapter = true)
+data class LoopRequest(
+    @Json(name = "loop") val loop: Boolean
+)

@@ -11,11 +11,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Indigo500,
-    background = AppBackground,
-    surface = CardBackground,
-    surfaceVariant = Slate800,
+    primary = CockpitSteel,
+    secondary = CockpitAmber,
+    tertiary = CockpitRed,
+    background = CockpitBackground,
+    surface = CockpitCard,
+    surfaceVariant = CockpitCardElevated,
+    outline = CockpitSurfaceBorder,
     onPrimary = TextPrimary,
+    onSecondary = CockpitBackground,
+    onTertiary = TextPrimary,
     onBackground = TextPrimary,
     onSurface = TextPrimary,
     onSurfaceVariant = TextSecondary
