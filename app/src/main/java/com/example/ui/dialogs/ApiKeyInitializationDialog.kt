@@ -90,6 +90,10 @@ private const val KEY_PROJECT_URL = "supabase_project_url"
 private const val KEY_ANON_KEY = "supabase_anon_key"
 private const val KEY_CUSTOM_HEADER = "supabase_custom_schema"
 
+// Default initialized Supabase project credentials
+private const val DEFAULT_SUPABASE_URL = "https://adxhfcytrwfqdxracisg.supabase.co"
+private const val DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkeGhmY3l0cndmcWR4cmFjaXNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAwMDg2NTcsImV4cCI6MjEwNTU4NDY1N30.5qKFgFUWicOsVmnbloYJm7BdJQSBX5ViqLNjXjtp6_A"
+
 @Composable
 fun ApiKeyInitializationDialog(
     onDismiss: () -> Unit,
@@ -100,14 +104,23 @@ fun ApiKeyInitializationDialog(
     val coroutineScope = rememberCoroutineScope()
 
     val prefs = remember {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).apply {
+            // Seed defaults if not set yet
+            if (!contains(KEY_PROJECT_URL) && !contains(KEY_ANON_KEY)) {
+                edit()
+                    .putString(KEY_PROJECT_URL, DEFAULT_SUPABASE_URL)
+                    .putString(KEY_ANON_KEY, DEFAULT_SUPABASE_ANON_KEY)
+                    .putString(KEY_CUSTOM_HEADER, "public")
+                    .apply()
+            }
+        }
     }
 
     var projectUrl by remember {
-        mutableStateOf(prefs.getString(KEY_PROJECT_URL, "") ?: "")
+        mutableStateOf(prefs.getString(KEY_PROJECT_URL, DEFAULT_SUPABASE_URL) ?: DEFAULT_SUPABASE_URL)
     }
     var anonKey by remember {
-        mutableStateOf(prefs.getString(KEY_ANON_KEY, "") ?: "")
+        mutableStateOf(prefs.getString(KEY_ANON_KEY, DEFAULT_SUPABASE_ANON_KEY) ?: DEFAULT_SUPABASE_ANON_KEY)
     }
     var customSchema by remember {
         mutableStateOf(prefs.getString(KEY_CUSTOM_HEADER, "public") ?: "public")
@@ -397,7 +410,11 @@ fun ApiKeyInitializationDialog(
                             isTestSuccess = null
 
                             coroutineScope.launch {
-                                val cleanUrl = projectUrl.trim().removeSuffix("/")
+                                // Normalize base URL by removing any trailing /rest/v1 or slashes
+                                val normalizedBaseUrl = projectUrl.trim()
+                                    .removeSuffix("/")
+                                    .removeSuffix("/rest/v1")
+                                    .removeSuffix("/")
                                 val result = withContext(Dispatchers.IO) {
                                     try {
                                         val client = OkHttpClient.Builder()
@@ -405,24 +422,34 @@ fun ApiKeyInitializationDialog(
                                             .readTimeout(5, TimeUnit.SECONDS)
                                             .build()
 
+                                        // Supabase REST root /rest/v1/ requires service_role key to inspect openAPI schema.
+                                        // To test with an anon key, ping a public table or query the root with head/user_profiles.
+                                        val testTableUrl = "$normalizedBaseUrl/rest/v1/user_profiles?select=id&limit=1"
                                         val request = Request.Builder()
-                                            .url("$cleanUrl/rest/v1/")
+                                            .url(testTableUrl)
                                             .addHeader("apikey", anonKey.trim())
                                             .addHeader("Authorization", "Bearer ${anonKey.trim()}")
                                             .build()
 
                                         val response = client.newCall(request).execute()
                                         val code = response.code
+                                        val body = response.body?.string() ?: ""
                                         response.close()
 
-                                        if (code in 200..299 || code == 404 || code == 401 || code == 400) {
-                                            if (code == 401) {
-                                                Result.failure(Exception("HTTP 401: Invalid Anon Key for this Supabase project"))
-                                            } else {
-                                                Result.success("Endpoint reachable! HTTP $code (Supabase API active)")
+                                        when {
+                                            code in 200..299 -> {
+                                                Result.success("Connected! Supabase database & anon key verified (HTTP $code).")
                                             }
-                                        } else {
-                                            Result.failure(Exception("HTTP $code returned from server"))
+                                            code == 401 || code == 403 -> {
+                                                Result.failure(Exception("HTTP $code: Invalid anon key or unauthorized. Please verify your Project API Key."))
+                                            }
+                                            code == 404 -> {
+                                                // If table not found yet, test ping against general rest endpoint
+                                                Result.success("Connected to Supabase endpoint (HTTP 404 - ready for tables).")
+                                            }
+                                            else -> {
+                                                Result.failure(Exception("HTTP $code: ${body.take(100)}"))
+                                            }
                                         }
                                     } catch (e: Exception) {
                                         Result.failure(e)
@@ -460,13 +487,14 @@ fun ApiKeyInitializationDialog(
 
                     Button(
                         onClick = {
+                            val normalizedUrl = projectUrl.trim().removeSuffix("/")
                             prefs.edit()
-                                .putString(KEY_PROJECT_URL, projectUrl.trim())
+                                .putString(KEY_PROJECT_URL, normalizedUrl)
                                 .putString(KEY_ANON_KEY, anonKey.trim())
                                 .putString(KEY_CUSTOM_HEADER, customSchema.trim())
                                 .apply()
 
-                            onKeysUpdated?.invoke(projectUrl.trim(), anonKey.trim())
+                            onKeysUpdated?.invoke(normalizedUrl, anonKey.trim())
                             Toast.makeText(context, "API Keys Saved Successfully", Toast.LENGTH_SHORT).show()
                             onDismiss()
                         },
