@@ -237,10 +237,10 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Constant size anomaly detected block (when anomalies detected and not on ANOMALIES tab)
-            val hasActiveAnomaly = health?.isAnomaly == true || detectedAnomalies.isNotEmpty()
+            val hasActiveAnomaly = detectedAnomalies.isNotEmpty() && (health?.isAnomaly == true || health?.status.equals("Anomaly", ignoreCase = true))
             if (hasActiveAnomaly && activeTab != SettingsSubTab.ANOMALIES) {
                 AnomalyDetectedHorizontalBlock(
-                    anomalyCount = detectedAnomalies.size.coerceAtLeast(1),
+                    anomalyCount = detectedAnomalies.size,
                     latestAnomaly = detectedAnomalies.firstOrNull(),
                     onClick = { activeTab = SettingsSubTab.ANOMALIES }
                 )
@@ -788,10 +788,10 @@ fun SettingsScreen(
 
                 SettingsSubTab.ANOMALIES -> {
                     // ====== ANOMALIES MONITORING & HISTORY (Everything Intact) ======
-                    val hasAnomaly = health?.isAnomaly == true || detectedAnomalies.isNotEmpty()
+                    val hasAnomaly = detectedAnomalies.isNotEmpty() && (health?.isAnomaly == true || health?.status.equals("Anomaly", ignoreCase = true))
                     if (hasAnomaly) {
                         AnomalyDetectedHorizontalBlock(
-                            anomalyCount = detectedAnomalies.size.coerceAtLeast(1),
+                            anomalyCount = detectedAnomalies.size,
                             latestAnomaly = detectedAnomalies.firstOrNull(),
                             onClick = { showAnomaliesDialog = true }
                         )
@@ -842,11 +842,12 @@ fun SettingsScreen(
                     }
 
                     // Autoencoder Vehicle Health Status Card
-                    val isAnomaly = health?.isAnomaly == true
+                    val currentHealth = health
+                    val isAnomaly = detectedAnomalies.isNotEmpty() && (currentHealth?.isAnomaly == true || currentHealth?.status.equals("Anomaly", ignoreCase = true))
                     val healthColor = if (isAnomaly) CockpitRed else CockpitGreen
                     val healthStatusText = if (isAnomaly) "ANOMALY FLAGGED" else "NORMAL HEALTH (99.8%)"
-                    val currentScore = health?.anomalyScore ?: 0.0018
-                    val threshold = health?.threshold ?: 0.0040
+                    val currentScore = if (isAnomaly) (currentHealth?.anomalyScore ?: 0.0068) else (if (currentHealth != null && !currentHealth.isAnomaly) currentHealth.anomalyScore else 0.00035)
+                    val threshold = currentHealth?.threshold ?: 0.0025
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -947,12 +948,13 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                val coolant = latestTick?.data?.coolantTemp?.toInt() ?: 85
-                                val throttle = latestTick?.data?.throttlePos?.toInt() ?: 20
-                                val rpm = latestTick?.data?.rpm?.toInt() ?: 750
-                                AnomalySensorTag("Coolant: ${coolant}°C", isAnomaly = coolant > 100)
-                                AnomalySensorTag("Throttle: ${throttle}%", isAnomaly = throttle > 85)
-                                AnomalySensorTag("RPM: $rpm", isAnomaly = rpm > 4500)
+                                val latestAnomaly = detectedAnomalies.firstOrNull()
+                                val coolant = if (isAnomaly) (latestAnomaly?.coolantTemp?.toInt() ?: 103) else (latestTick?.data?.coolantTemp?.toInt() ?: 85)
+                                val throttle = if (isAnomaly) (latestAnomaly?.throttlePos?.toInt() ?: 89) else (latestTick?.data?.throttlePos?.toInt() ?: 20)
+                                val rpm = if (isAnomaly) (latestAnomaly?.rpm?.toInt() ?: 3450) else (latestTick?.data?.rpm?.toInt() ?: 750)
+                                AnomalySensorTag("Coolant: ${coolant}°C", isAnomaly = isAnomaly && coolant > 100)
+                                AnomalySensorTag("Throttle: ${throttle}%", isAnomaly = isAnomaly && throttle > 85)
+                                AnomalySensorTag("RPM: $rpm", isAnomaly = isAnomaly && rpm > 4500)
                             }
                         }
                     }

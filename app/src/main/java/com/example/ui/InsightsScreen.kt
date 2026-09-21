@@ -118,10 +118,10 @@ fun InsightsScreen(viewModel: SharedTelemetryViewModel) {
         )
 
         // Constant size anomaly detected block small spread horizontally which on clicking shows anomalies obtained till now
-        val hasAnomaly = health?.isAnomaly == true || health?.status.equals("Anomaly", ignoreCase = true) || detectedAnomalies.isNotEmpty()
+        val hasAnomaly = detectedAnomalies.isNotEmpty() && (health?.isAnomaly == true || health?.status.equals("Anomaly", ignoreCase = true))
         if (hasAnomaly) {
             AnomalyDetectedHorizontalBlock(
-                anomalyCount = detectedAnomalies.size.coerceAtLeast(1),
+                anomalyCount = detectedAnomalies.size,
                 latestAnomaly = detectedAnomalies.firstOrNull(),
                 onClick = { showAnomaliesDialog = true }
             )

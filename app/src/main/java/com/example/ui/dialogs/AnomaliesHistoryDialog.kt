@@ -178,6 +178,9 @@ fun AnomaliesHistoryDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Header
+                val hasAnomalies = anomalies.isNotEmpty()
+                val headerColor = if (hasAnomalies) CockpitRed else CockpitGreen
+                val headerIcon = if (hasAnomalies) Icons.Default.Warning else Icons.Default.CheckCircle
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -191,26 +194,26 @@ fun AnomaliesHistoryDialog(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(CockpitRed.copy(alpha = 0.2f)),
+                                .background(headerColor.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Warning,
+                                imageVector = headerIcon,
                                 contentDescription = null,
-                                tint = CockpitRed,
+                                tint = headerColor,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
 
                         Column {
                             Text(
-                                text = "ANOMALIES OBTAINED",
+                                text = if (hasAnomalies) "ANOMALIES OBTAINED" else "NO ANOMALIES",
                                 color = TextPrimary,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Black
                             )
                             Text(
-                                text = "${anomalies.size} event${if (anomalies.size != 1) "s" else ""} logged this trip",
+                                text = if (hasAnomalies) "${anomalies.size} event${if (anomalies.size != 1) "s" else ""} logged this trip" else "System nominal • Safe operating bounds",
                                 color = TextMuted,
                                 fontSize = 11.sp
                             )

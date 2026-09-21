@@ -223,6 +223,15 @@ class SharedTelemetryViewModel(
         if (_activeAlert.value?.id == "alert-anomaly") {
             _activeAlert.value = null
         }
+        val currentThreshold = _healthPrediction.value?.threshold ?: 0.0025
+        _healthPrediction.value = HealthPredictionResponse(
+            anomalyScore = 0.00035,
+            threshold = currentThreshold,
+            isAnomaly = false,
+            status = "Normal",
+            triggeredFeatures = emptyList(),
+            featureErrors = emptyMap()
+        )
     }
 
     fun simulateTestAnomaly() {
