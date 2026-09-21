@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.LocalGasStation
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShowChart
@@ -77,11 +76,6 @@ fun CockpitOverflowMenu(
                 onDismissRequest()
                 onSelectSwitchUser()
             }
-        )
-        DropdownMenuItem(
-            text = { Text("Graphic Theme: Cockpit Dark", color = TextPrimary, fontSize = 13.sp) },
-            leadingIcon = { Icon(Icons.Default.Palette, contentDescription = null, tint = CockpitSteel, modifier = Modifier.size(18.dp)) },
-            onClick = { onDismissRequest() }
         )
         DropdownMenuItem(
             text = { Text("Quick Guide", color = TextPrimary, fontSize = 13.sp) },

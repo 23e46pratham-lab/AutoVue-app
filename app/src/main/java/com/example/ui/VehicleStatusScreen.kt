@@ -446,14 +446,14 @@ fun VehicleStatusScreen(
 
         // =========================================================================
         // MIDDLE SECTION: VERTICAL PREVIOUS TRIPS FEED
-        // Small, translucent boxes stacked vertically (one after the other)
-        // Each box acts as a clickable button to reveal inline details & map
+        // Only shown when trips exist (no mock data)
         // =========================================================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        if (trips.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.History,
@@ -773,6 +773,7 @@ fun VehicleStatusScreen(
                     }
                 }
             }
+        }
         }
     }
 }
