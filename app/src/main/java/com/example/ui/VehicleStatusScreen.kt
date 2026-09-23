@@ -832,7 +832,7 @@ private fun EmbeddedTripMapView(
             .fillMaxWidth()
             .height(210.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFF0C111A))
+            .background(CockpitCardElevated)
             .border(1.dp, CardBorder, RoundedCornerShape(10.dp))
     ) {
         // Tactical Map Canvas
@@ -850,7 +850,7 @@ private fun EmbeddedTripMapView(
             var x = startX
             while (x < w) {
                 drawLine(
-                    color = Color(0xFF161F2E),
+                    color = CardBorder,
                     start = Offset(x, 0f),
                     end = Offset(x, h),
                     strokeWidth = 1.dp.toPx()
@@ -861,7 +861,7 @@ private fun EmbeddedTripMapView(
             var y = startY
             while (y < h) {
                 drawLine(
-                    color = Color(0xFF161F2E),
+                    color = CardBorder,
                     start = Offset(0f, y),
                     end = Offset(w, y),
                     strokeWidth = 1.dp.toPx()
@@ -898,7 +898,7 @@ private fun EmbeddedTripMapView(
             // Draw road outline
             drawPath(
                 path = arteryPath,
-                color = Color(0xFF1E293B),
+                color = CockpitSurfaceBorder,
                 style = Stroke(width = 10.dp.toPx() * zoomLevel)
             )
 

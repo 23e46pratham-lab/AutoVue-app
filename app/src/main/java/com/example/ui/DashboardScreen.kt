@@ -70,6 +70,8 @@ import com.example.ui.dialogs.ObdConnectionDialog
 import com.example.ui.dialogs.QuickGuideDialog
 import com.example.ui.dialogs.RefuelingDialog
 import com.example.ui.dialogs.VehicleProfileDialog
+import com.example.ui.theme.AtherCyan
+import com.example.ui.theme.AtherMint
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
@@ -195,9 +197,9 @@ fun DashboardScreen(
 
                 Surface(
                     onClick = { showObdDialog = true },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(50),
                     color = obdBadgeColor.copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, obdBadgeColor.copy(alpha = 0.45f)),
+                    border = BorderStroke(0.75.dp, obdBadgeColor.copy(alpha = 0.45f)),
                     modifier = Modifier.padding(end = 2.dp)
                 ) {
                     Row(
@@ -295,21 +297,22 @@ fun DashboardScreen(
                 onClick = onNavigateToInsights,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(8.dp)
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
+                shape = RoundedCornerShape(50)
             ) {
                 Icon(
                     imageVector = Icons.Default.Analytics,
                     contentDescription = "ML Insights",
-                    tint = CockpitSteel,
-                    modifier = Modifier.size(16.dp)
+                    tint = AtherMint,
+                    modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "ML INSIGHTS",
+                    text = "INSIGHTS",
                     color = TextPrimary,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
             }
 
@@ -317,21 +320,22 @@ fun DashboardScreen(
                 onClick = { showRefuelingDialog = true },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(8.dp)
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
+                shape = RoundedCornerShape(50)
             ) {
                 Icon(
                     imageVector = Icons.Default.LocalGasStation,
                     contentDescription = "Refuel",
                     tint = CockpitAmber,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
-                    text = "REFUELING",
+                    text = "REFUEL",
                     color = TextPrimary,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
             }
 
@@ -339,21 +343,22 @@ fun DashboardScreen(
                 onClick = { showGuideDialog = true },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(8.dp)
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
+                shape = RoundedCornerShape(50)
             ) {
                 Icon(
                     imageVector = Icons.Default.HelpOutline,
                     contentDescription = "Guide",
                     tint = CockpitSteel,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "GUIDE",
                     color = TextPrimary,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
                 )
             }
         }
@@ -370,14 +375,14 @@ fun DashboardScreen(
         // Subsystem Telemetry Status Strip
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(containerColor = CockpitCard),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+            border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(10.dp),
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -385,10 +390,10 @@ fun DashboardScreen(
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Engine Status",
-                        tint = CockpitGreen,
+                        tint = AtherMint,
                         modifier = Modifier.size(15.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "ECU Protocol: ISO 15765-4 (CAN 11/500)",
                         color = TextSecondary,
@@ -397,7 +402,7 @@ fun DashboardScreen(
                 }
                 Text(
                     text = "9.6 PID/s",
-                    color = CockpitSteel,
+                    color = AtherMint,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -592,9 +597,9 @@ private fun DashboardMlInferencesCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = CockpitCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
     ) {
         Column(
             modifier = Modifier
@@ -615,30 +620,32 @@ private fun DashboardMlInferencesCard(
                     Icon(
                         imageVector = Icons.Default.Analytics,
                         contentDescription = "ML Models",
-                        tint = CockpitSteel,
+                        tint = AtherMint,
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
                         text = "PREVIOUS ML INFERENCES",
                         color = TextPrimary,
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.3.sp
                     )
                 }
 
                 Button(
                     onClick = onViewFullInsights,
                     colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = androidx.compose.foundation.BorderStroke(0.75.dp, AtherMint.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(50),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                     modifier = Modifier.height(28.dp)
                 ) {
                     Text(
                         text = "DETAILED →",
-                        color = CockpitSteel,
+                        color = AtherMint,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
                     )
                 }
             }
@@ -654,9 +661,9 @@ private fun DashboardMlInferencesCard(
             val behaviourMessage = behaviour?.ttsMessage ?: "Smooth eco-driving observed. Preserving fuel."
 
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = CockpitCardElevated,
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -701,15 +708,17 @@ private fun DashboardMlInferencesCard(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(behaviourColor.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(behaviourColor.copy(alpha = 0.16f))
+                            .border(0.75.dp, behaviourColor.copy(alpha = 0.35f), RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = behaviourLabel.uppercase(Locale.US),
                             color = behaviourColor,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
@@ -728,9 +737,9 @@ private fun DashboardMlInferencesCard(
             } else "1.84 g/s"
 
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = CockpitCardElevated,
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -748,7 +757,7 @@ private fun DashboardMlInferencesCard(
                             Icon(
                                 imageVector = Icons.Default.Speed,
                                 contentDescription = null,
-                                tint = CockpitSteel,
+                                tint = AtherMint,
                                 modifier = Modifier.size(14.dp)
                             )
                             Text(
@@ -773,15 +782,17 @@ private fun DashboardMlInferencesCard(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(CockpitGreen.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(CockpitGreen.copy(alpha = 0.16f))
+                            .border(0.75.dp, CockpitGreen.copy(alpha = 0.35f), RoundedCornerShape(50))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "TIER 1",
                             color = CockpitGreen,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Black
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
@@ -797,26 +808,26 @@ private fun DashboardMlInferencesCard(
                     enabled = !isAnalyzing,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
-                    shape = RoundedCornerShape(8.dp)
+                    border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
+                    shape = RoundedCornerShape(50)
                 ) {
                     if (isAnalyzing) {
                         CircularProgressIndicator(
-                            color = CockpitSteel,
+                            color = AtherMint,
                             strokeWidth = 2.dp,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("RUNNING INFERENCE...", color = CockpitSteel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("RUNNING INFERENCE...", color = AtherMint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = null,
-                            tint = CockpitSteel,
+                            tint = AtherMint,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("RE-RUN ML INFERENCE", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("RE-RUN ML INFERENCE", color = TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                     }
                 }
             }

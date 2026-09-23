@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CardBackground
 import com.example.ui.theme.CardBorder
+import com.example.ui.theme.CockpitCardElevated
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import kotlin.math.max
@@ -200,7 +201,7 @@ fun TelemetryGraphCard(
                     .fillMaxWidth()
                     .height(130.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF090D16))
+                    .background(CockpitCardElevated)
                     .padding(horizontal = 4.dp, vertical = 6.dp)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
@@ -225,7 +226,7 @@ fun TelemetryGraphCard(
 
                         // Dotted gridline
                         drawLine(
-                            color = Color.White.copy(alpha = 0.08f),
+                            color = CardBorder,
                             start = Offset(paddingLeft, yPos),
                             end = Offset(width - paddingRight, yPos),
                             strokeWidth = 1.dp.toPx(),
@@ -235,7 +236,7 @@ fun TelemetryGraphCard(
                         // Y Axis text
                         drawContext.canvas.nativeCanvas.apply {
                             val paint = android.graphics.Paint().apply {
-                                color = android.graphics.Color.argb(140, 148, 163, 184)
+                                color = android.graphics.Color.argb(180, 99, 89, 79)
                                 textSize = 9.sp.toPx()
                                 isAntiAlias = true
                                 textAlign = android.graphics.Paint.Align.RIGHT
@@ -256,7 +257,7 @@ fun TelemetryGraphCard(
                         val xPos = paddingLeft + chartWidth * xFraction
 
                         drawLine(
-                            color = Color.White.copy(alpha = 0.05f),
+                            color = CardBorder.copy(alpha = 0.6f),
                             start = Offset(xPos, paddingTop),
                             end = Offset(xPos, height - paddingBottom),
                             strokeWidth = 1.dp.toPx()
@@ -265,7 +266,7 @@ fun TelemetryGraphCard(
                         // X Axis label (relative points / seconds)
                         drawContext.canvas.nativeCanvas.apply {
                             val paint = android.graphics.Paint().apply {
-                                color = android.graphics.Color.argb(120, 100, 116, 139)
+                                color = android.graphics.Color.argb(160, 148, 136, 123)
                                 textSize = 8.5.sp.toPx()
                                 isAntiAlias = true
                                 textAlign = android.graphics.Paint.Align.CENTER

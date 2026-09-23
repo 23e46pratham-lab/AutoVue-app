@@ -223,7 +223,7 @@ fun CockpitInstrumentCluster(
                 // Dial background ring
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF161E2A), Color(0xFF0F141D)),
+                        colors = listOf(CockpitCard, CockpitCardElevated),
                         center = center,
                         radius = dialRadius
                     ),
@@ -367,7 +367,7 @@ fun CockpitInstrumentCluster(
                 drawPath(path = needlePath, color = CockpitRed)
 
                 // Center pivot cap
-                drawCircle(color = Color(0xFF1E2633), radius = 8.dp.toPx(), center = center)
+                drawCircle(color = CockpitCardElevated, radius = 8.dp.toPx(), center = center)
                 drawCircle(color = CockpitRed, radius = 4.dp.toPx(), center = center)
             }
 
@@ -496,7 +496,7 @@ fun CockpitInstrumentCluster(
                     .align(Alignment.Center)
                     .padding(top = 64.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF0F141D))
+                    .background(CockpitCardElevated)
                     .border(1.dp, CockpitSurfaceBorder, RoundedCornerShape(6.dp))
                     .padding(horizontal = 14.dp, vertical = 4.dp),
                 contentAlignment = Alignment.Center

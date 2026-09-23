@@ -67,8 +67,8 @@ data class BottomNavItem(val name: String, val route: Screen, val icon: ImageVec
 val bottomNavItems = listOf(
     BottomNavItem("Cluster", Screen.Dashboard, Icons.Default.Speed),
     BottomNavItem("Live", Screen.LiveData, Icons.Default.ShowChart),
-    BottomNavItem("ML Insights", Screen.Insights, Icons.Default.Analytics),
-    BottomNavItem("Vehicle", Screen.VehicleStatus, Icons.Default.DirectionsCar),
+    BottomNavItem("ML", Screen.Insights, Icons.Default.Analytics),
+    BottomNavItem("Trip", Screen.TripMap, Icons.Default.Map),
     BottomNavItem("DTCs", Screen.DtcScanner, Icons.Default.Warning)
 )
 

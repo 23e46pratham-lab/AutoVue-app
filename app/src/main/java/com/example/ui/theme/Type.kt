@@ -132,3 +132,41 @@ val Typography = Typography(
         letterSpacing = 0.5.sp
     )
 )
+
+// =========================================================================
+// Ather-inspired Modern Geometric Sans-Serif Telemetry Typography
+// =========================================================================
+val TelemetrySpeedNumber = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.Black,
+    fontSize = 32.sp,
+    letterSpacing = (-0.5).sp
+)
+
+val TelemetryMetricLarge = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.ExtraBold,
+    fontSize = 24.sp,
+    letterSpacing = (-0.2).sp
+)
+
+val TelemetryMetricValue = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 15.sp,
+    letterSpacing = 0.2.sp
+)
+
+val TelemetryMetricLabel = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 11.sp,
+    letterSpacing = 0.8.sp
+)
+
+val PillBadgeText = TextStyle(
+    fontFamily = InterFontFamily,
+    fontWeight = FontWeight.Bold,
+    fontSize = 10.sp,
+    letterSpacing = 0.5.sp
+)

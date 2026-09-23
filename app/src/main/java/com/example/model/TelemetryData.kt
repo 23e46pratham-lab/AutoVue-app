@@ -15,7 +15,10 @@ data class TelemetryTick(
     @Json(name = "elapsed_seconds") val elapsedSeconds: Double = 0.0,
     @Json(name = "playback_percent") val playbackPercent: Double = 0.0,
     @Json(name = "data") val data: TelemetryData = TelemetryData(),
-    @Json(name = "ml") val ml: MlInferencePayload? = null
+    @Json(name = "dataset_data") val datasetData: TelemetryData? = null,
+    @Json(name = "overrides") val overrides: List<String>? = null,
+    @Json(name = "ml") val ml: MlInferencePayload? = null,
+    @Json(name = "dtcs") val dtcs: List<String>? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -36,5 +39,14 @@ data class TelemetryData(
     @Json(name = "throttle_pos") val throttlePos: Double = 0.0,
     @Json(name = "ambient_temp") val ambientTemp: Double = 0.0,
     @Json(name = "pedal_d") val pedalD: Double = 0.0,
-    @Json(name = "pedal_e") val pedalE: Double = 0.0
-)
+    @Json(name = "pedal_e") val pedalE: Double = 0.0,
+    @Json(name = "lat") val lat: Double? = null,
+    @Json(name = "lon") val lon: Double? = null,
+    @Json(name = "elevation_m") val elevationM: Double? = null,
+    @Json(name = "gps_bearing") val gpsBearing: Double? = null,
+    @Json(name = "gps_speed_ms") val gpsSpeedMs: Double? = null,
+    @Json(name = "gps_fix") val gpsFix: Int? = null
+) {
+    val hasGps: Boolean
+        get() = lat != null && lon != null
+}

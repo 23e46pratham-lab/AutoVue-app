@@ -86,12 +86,14 @@ import com.example.model.EcuCodeInfo
 import com.example.model.ServiceTicket
 import com.example.model.TicketStatus
 import com.example.model.UrgencyLevel
+import com.example.ui.theme.CockpitCardElevated
 import com.example.ui.theme.Emerald400
 import com.example.ui.theme.Emerald500
 import com.example.ui.theme.Indigo400
 import com.example.ui.theme.Indigo500
 import com.example.ui.theme.Slate800
 import com.example.ui.theme.StatusRed
+import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.SharedTelemetryViewModel
 
 val commonEcuCodes = listOf(
@@ -203,8 +205,8 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                 if (activeFaultWarning == null) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF1B382B),
-                        border = BorderStroke(1.dp, Color(0xFF2E7D32)),
+                        color = Color(0xFFE8F5E9),
+                        border = BorderStroke(1.dp, Color(0xFFA5D6A7)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -215,7 +217,7 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Healthy",
-                                tint = Emerald400,
+                                tint = Emerald500,
                                 modifier = Modifier.size(20.dp)
                             )
                             Column {
@@ -223,13 +225,13 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                                     text = "ALL ECU SENSORS HEALTHY",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = Emerald400
+                                    color = Color(0xFF1B5E20)
                                 )
                                 Text(
                                     text = "No active trouble codes are present. You can still register custom issues (e.g., oil level, fluid leaks, transmission sound, squeaking brakes) manually below.",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 11.sp,
-                                    color = Color(0xFFC8E6C9),
+                                    color = Color(0xFF2E7D32),
                                     lineHeight = 15.sp
                                 )
                             }
@@ -238,7 +240,7 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                 } else {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF3E2723),
+                        color = Color(0xFFFFEBEE),
                         border = BorderStroke(1.dp, StatusRed),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -263,13 +265,13 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                                         text = "ECU FAULT ALERT DETECTED",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.ExtraBold,
-                                        color = StatusRed
+                                        color = Color(0xFFB71C1C)
                                     )
                                     Text(
                                         text = activeFaultWarning,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontSize = 11.sp,
-                                        color = Color(0xFFFFCCBC)
+                                        color = Color(0xFFC62828)
                                     )
                                 }
                             }
@@ -643,14 +645,14 @@ fun MaintenanceScreen(viewModel: SharedTelemetryViewModel) {
                     ) {
                         Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (telegramGatewayEnabled) Color(0xFF1B382B) else Slate800,
+                    color = if (telegramGatewayEnabled) Color(0xFFE8F5E9) else CockpitCardElevated,
                     modifier = Modifier.padding(vertical = 2.dp)
                 ) {
                     Text(
                         text = if (telegramGatewayEnabled) "GATEWAY STATUS: ENABLED / ONLINE" else "GATEWAY STATUS: MUTED / DISABLED",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (telegramGatewayEnabled) Emerald400 else Color.LightGray,
+                        color = if (telegramGatewayEnabled) Color(0xFF1B5E20) else TextSecondary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         fontSize = 10.sp
                     )
@@ -777,8 +779,8 @@ private fun PortalHeader(
     val distKm = "%.1f".format(elapsedSeconds * 0.015)
 
     val isHealthy = healthStatus.equals("Normal", ignoreCase = true)
-    val statusPillColor = if (isHealthy) Color(0xFF1B382B) else Color(0xFF3E2723)
-    val statusTextColor = if (isHealthy) Emerald400 else StatusRed
+    val statusPillColor = if (isHealthy) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
+    val statusTextColor = if (isHealthy) Color(0xFF1B5E20) else Color(0xFFB71C1C)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -926,14 +928,14 @@ private fun ServiceTicketItem(
 
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = if (isResolved) Color(0xFF1B382B) else Color(0xFF1A237E)
+                    color = if (isResolved) Color(0xFFE8F5E9) else Color(0xFFEDE7F6)
                 ) {
                     Text(
                         text = ticket.status.label,
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isResolved) Emerald400 else Color(0xFF9FA8DA),
+                        color = if (isResolved) Color(0xFF1B5E20) else Color(0xFF4527A0),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }

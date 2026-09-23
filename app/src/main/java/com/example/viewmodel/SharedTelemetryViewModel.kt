@@ -178,6 +178,16 @@ class SharedTelemetryViewModel(
     private val _isScanningDtcs = MutableStateFlow(false)
     val isScanningDtcs = _isScanningDtcs.asStateFlow()
 
+    // GPS & Route State
+    private val _routeData = MutableStateFlow<com.example.model.RouteResponse?>(null)
+    val routeData = _routeData.asStateFlow()
+
+    private val _tripSummary = MutableStateFlow<com.example.model.TripSummaryResponse?>(null)
+    val tripSummary = _tripSummary.asStateFlow()
+
+    private val _liveGpsTrail = MutableStateFlow<List<Pair<Double, Double>>>(emptyList())
+    val liveGpsTrail = _liveGpsTrail.asStateFlow()
+
     fun updateVehicleProfile(profile: VehicleProfile) {
         _vehicleProfile.value = profile
     }
@@ -293,28 +303,52 @@ class SharedTelemetryViewModel(
     fun scanDtcs() {
         viewModelScope.launch {
             _isScanningDtcs.value = true
-            delay(1200) // Scan delay across ECU bus
-            _dtcCodes.value = emptyList() // Clean ECU read with mode 03/07
+            delay(600) // Scan delay across ECU bus
+            val result = repository.getDtcs()
+            result.onSuccess { codes ->
+                _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
+            }.onFailure {
+                // If backend call fails or no codes, preserve or check
+            }
             _isScanningDtcs.value = false
         }
     }
 
-    fun simulateTestDtc() {
-        _dtcCodes.value = listOf(
-            DtcCode(
-                code = "P0171",
-                system = "Powertrain / Fuel Trim",
-                description = "Fuel System Too Lean (Bank 1)",
-                mode = "Mode 03",
-                severity = "Attention",
-                plainMeaning = "Engine receives slightly more air than fuel ratio target.",
-                plainAction = "Inspect mass air flow sensor and vacuum hoses for leaks."
-            )
-        )
+    fun simulateTestDtc(code: String = "P0171") {
+        viewModelScope.launch {
+            val result = repository.setDtcs(listOf(code))
+            result.onSuccess { codes ->
+                _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
+            }.onFailure {
+                _dtcCodes.value = listOf(com.example.utils.DtcDecoder.decode(code))
+            }
+        }
     }
 
     fun clearDtcs() {
-        _dtcCodes.value = emptyList()
+        viewModelScope.launch {
+            repository.clearDtcs()
+            _dtcCodes.value = emptyList()
+        }
+    }
+
+    fun fetchDtcsFromBackend() {
+        viewModelScope.launch {
+            repository.getDtcs().onSuccess { codes ->
+                _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
+            }
+        }
+    }
+
+    fun fetchGpsRouteAndSummary() {
+        viewModelScope.launch {
+            repository.getRoute().onSuccess { route ->
+                _routeData.value = route
+            }
+            repository.getTripSummary().onSuccess { summary ->
+                _tripSummary.value = summary
+            }
+        }
     }
 
     private var telemetryJob: Job? = null
@@ -332,6 +366,8 @@ class SharedTelemetryViewModel(
     init {
         startObserving()
         startPollingFallback()
+        fetchGpsRouteAndSummary()
+        fetchDtcsFromBackend()
         viewModelScope.launch {
             repository.latestTick.collectLatest { tick ->
                 if (tick != null) {
@@ -343,6 +379,26 @@ class SharedTelemetryViewModel(
                         currentHistory.removeAt(0)
                     }
                     _history.value = currentHistory
+
+                    // Process DTCs pushed directly over WebSocket / live-data tick
+                    tick.dtcs?.let { codes ->
+                        _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
+                    }
+
+                    // Process Live GPS coordinates
+                    if (tick.data.hasGps) {
+                        val lat = tick.data.lat
+                        val lon = tick.data.lon
+                        if (lat != null && lon != null) {
+                            val currentGpsList = _liveGpsTrail.value.toMutableList()
+                            val lastPoint = currentGpsList.lastOrNull()
+                            if (lastPoint == null || Math.abs(lastPoint.first - lat) > 0.00001 || Math.abs(lastPoint.second - lon) > 0.00001) {
+                                currentGpsList.add(Pair(lat, lon))
+                                if (currentGpsList.size > 2000) currentGpsList.removeAt(0)
+                                _liveGpsTrail.value = currentGpsList
+                            }
+                        }
+                    }
 
                     // Extract real-time ML results pushed directly over WebSocket / live-data!
                     tick.ml?.let { ml ->
@@ -713,6 +769,7 @@ class SharedTelemetryViewModel(
     private fun startPollingFallback() {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
+            var counter = 0
             while (isActive) {
                 val now = System.currentTimeMillis()
                 // If we haven't received a tick in the last 1500ms, fetch via REST polling
@@ -721,6 +778,10 @@ class SharedTelemetryViewModel(
                     if (result.isSuccess && result.getOrNull() != null) {
                         lastTickTimestamp = System.currentTimeMillis()
                     }
+                }
+                counter++
+                if (counter % 4 == 0) {
+                    fetchDtcsFromBackend()
                 }
                 delay(1000)
             }

@@ -66,6 +66,8 @@ import com.example.ui.dialogs.AnomalyDetectedHorizontalBlock
 import com.example.model.DriverBehaviourResponse
 import com.example.model.FuelPredictionResponse
 import com.example.model.HealthPredictionResponse
+import com.example.ui.theme.AtherCyan
+import com.example.ui.theme.AtherMint
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
@@ -187,15 +189,15 @@ private fun AiInsightsHeaderCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = CockpitCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -210,13 +212,14 @@ private fun AiInsightsHeaderCard(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(CockpitCardElevated),
+                            .background(CockpitCardElevated)
+                            .border(0.75.dp, CockpitSurfaceBorder, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "AI Icon",
-                            tint = CockpitSteel,
+                            tint = AtherCyan,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -243,13 +246,13 @@ private fun AiInsightsHeaderCard(
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = CockpitSteel
+                            color = AtherCyan
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Refresh Inference",
-                            tint = CockpitSteel
+                            tint = AtherCyan
                         )
                     }
                 }
@@ -262,15 +265,20 @@ private fun AiInsightsHeaderCard(
             ) {
                 val hasModels = lastTimestamp != null
                 val statusText = if (isAnalyzing) "Analyzing Telemetry..." else if (hasModels) "ML Inferences Active" else "Ready to Analyze"
-                val statusColor = if (isAnalyzing) CockpitAmber else if (hasModels) CockpitGreen else TextMuted
+                val statusColor = if (isAnalyzing) CockpitAmber else if (hasModels) AtherMint else TextMuted
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(statusColor.copy(alpha = 0.15f))
+                        .border(0.75.dp, statusColor.copy(alpha = 0.35f), RoundedCornerShape(50))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
                             .background(statusColor)
                     )
@@ -298,15 +306,15 @@ private fun AiInsightsHeaderCard(
 @Composable
 private fun VehicleHealthCard(health: HealthPredictionResponse) {
     val isAnomaly = health.isAnomaly || health.status.equals("Anomaly", ignoreCase = true)
-    val statusColor = if (!isAnomaly) CockpitGreen else CockpitRed
+    val statusColor = if (!isAnomaly) AtherMint else CockpitRed
     val statusContainerColor = statusColor.copy(alpha = 0.15f)
     val statusIcon = if (!isAnomaly) Icons.Default.CheckCircle else Icons.Default.Warning
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = CockpitCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -319,7 +327,7 @@ private fun VehicleHealthCard(health: HealthPredictionResponse) {
                 Icon(
                     imageVector = Icons.Default.HealthAndSafety,
                     contentDescription = "Vehicle Health",
-                    tint = CockpitSteel,
+                    tint = AtherCyan,
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
@@ -332,9 +340,9 @@ private fun VehicleHealthCard(health: HealthPredictionResponse) {
 
             // Health Status Hero Banner
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = statusContainerColor,
-                border = androidx.compose.foundation.BorderStroke(1.dp, statusColor.copy(alpha = 0.5f)),
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, statusColor.copy(alpha = 0.4f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -485,16 +493,16 @@ private fun VehicleHealthCard(health: HealthPredictionResponse) {
 @Composable
 private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
     val (badgeColor, badgeContainerColor) = when (behaviour.label.lowercase(Locale.US)) {
-        "economical", "eco", "cautious" -> Pair(CockpitGreen, CockpitGreen.copy(alpha = 0.15f))
-        "moderate", "normal" -> Pair(CockpitSteel, CockpitSteel.copy(alpha = 0.15f))
+        "economical", "eco", "cautious" -> Pair(AtherMint, AtherMint.copy(alpha = 0.15f))
+        "moderate", "normal" -> Pair(AtherCyan, AtherCyan.copy(alpha = 0.15f))
         else -> Pair(CockpitRed, CockpitRed.copy(alpha = 0.15f)) // Aggressive
     }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = CockpitCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -507,7 +515,7 @@ private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
                 Icon(
                     imageVector = Icons.Default.DirectionsCar,
                     contentDescription = "Driver Behaviour",
-                    tint = CockpitSteel,
+                    tint = AtherCyan,
                     modifier = Modifier.size(22.dp)
                 )
                 Text(
@@ -520,9 +528,9 @@ private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
 
             // Classification Badge Card
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = badgeContainerColor,
-                border = androidx.compose.foundation.BorderStroke(1.dp, badgeColor.copy(alpha = 0.4f)),
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, badgeColor.copy(alpha = 0.4f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -549,7 +557,7 @@ private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
 
                     if (behaviour.confidence > 0.0) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(50),
                             color = badgeColor,
                             modifier = Modifier.padding(start = 8.dp)
                         ) {
@@ -557,8 +565,8 @@ private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
                                 text = "%.1f%% Conf".format(behaviour.confidence * 100),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                color = Color.Black,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -648,9 +656,9 @@ private fun DriverBehaviourCard(behaviour: DriverBehaviourResponse) {
 private fun FuelEfficiencyCard(fuel: FuelPredictionResponse) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = CockpitCard),
-        border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+        border = androidx.compose.foundation.BorderStroke(0.75.dp, CardBorder)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -668,7 +676,7 @@ private fun FuelEfficiencyCard(fuel: FuelPredictionResponse) {
                     Icon(
                         imageVector = Icons.Default.Speed,
                         contentDescription = "Fuel Efficiency",
-                        tint = CockpitSteel,
+                        tint = AtherCyan,
                         modifier = Modifier.size(22.dp)
                     )
                     Text(
@@ -680,25 +688,25 @@ private fun FuelEfficiencyCard(fuel: FuelPredictionResponse) {
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = CockpitGreen.copy(alpha = 0.15f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CockpitGreen.copy(alpha = 0.4f))
+                    shape = RoundedCornerShape(50),
+                    color = AtherMint.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(0.75.dp, AtherMint.copy(alpha = 0.4f))
                 ) {
                     Text(
                         text = "Tier ${fuel.tier} • ${(fuel.method ?: "maf").uppercase(Locale.US)}",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = CockpitGreen,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        color = AtherMint,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
             }
 
             // Mileage Main Card
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = CockpitCardElevated,
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder),
+                border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(

@@ -76,10 +76,10 @@ fun TopTelemetryHud(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(CockpitCard)
-            .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .border(0.75.dp, CardBorder, RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Row 1: Time, Distance, Cost

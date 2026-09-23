@@ -143,6 +143,31 @@ class TelemetryRepository(
     suspend fun pingBackend(): Result<Any> = runCatching {
         api.pingHealth()
     }
+
+    suspend fun getRoute(): Result<com.example.model.RouteResponse> = runCatching {
+        api.getRoute()
+    }
+
+    suspend fun getTripSummary(): Result<com.example.model.TripSummaryResponse> = runCatching {
+        api.getTripSummary()
+    }
+
+    suspend fun getDtcs(): Result<List<String>> = runCatching {
+        api.getDtcs().dtcs
+    }
+
+    suspend fun setDtcs(codes: List<String>): Result<List<String>> = runCatching {
+        api.setDtcs(com.example.model.DtcRequest(codes)).dtcs
+    }
+
+    suspend fun clearDtcs(): Result<Unit> = runCatching {
+        api.clearDtcs()
+        Unit
+    }
+
+    suspend fun deleteDtc(code: String): Result<List<String>> = runCatching {
+        api.deleteDtc(code).dtcs
+    }
 }
 
 enum class ConnectionStatus {

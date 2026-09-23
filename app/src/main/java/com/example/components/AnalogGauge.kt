@@ -26,6 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.CockpitCardElevated
+import com.example.ui.theme.CockpitGaugeTrack
+import com.example.ui.theme.CockpitRed
 import com.example.ui.theme.Indigo400
 import com.example.ui.theme.Indigo500
 import com.example.ui.theme.Slate800
@@ -44,7 +47,7 @@ fun AnalogGauge(
     minorDivisions: Int = 2,
     redlineStart: Float? = maxValue * 0.75f,
     gaugeColor: Color = Indigo500,
-    needleColor: Color = Color(0xFFFF3D00),
+    needleColor: Color = CockpitRed,
     valueTextOverride: String? = null,
     tickLabelFormatter: ((Float) -> String) = { it.toInt().toString() }
 ) {
@@ -74,7 +77,7 @@ fun AnalogGauge(
 
             // 1. Draw outer gauge arc (track)
             drawArc(
-                color = Slate800.copy(alpha = 0.5f),
+                color = CockpitGaugeTrack,
                 startAngle = startAngle,
                 sweepAngle = sweepAngle,
                 useCenter = false,
@@ -197,7 +200,7 @@ fun AnalogGauge(
 
             // Needle pivot cap (center circles)
             drawCircle(
-                color = Slate800,
+                color = CockpitCardElevated,
                 radius = 7.dp.toPx(),
                 center = center
             )

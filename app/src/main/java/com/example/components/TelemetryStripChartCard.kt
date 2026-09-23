@@ -155,7 +155,7 @@ fun TelemetryStripChartCard(
                     .fillMaxWidth()
                     .height(68.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF090C10))
+                    .background(CockpitCardElevated)
                     .border(1.dp, CockpitSurfaceBorder, RoundedCornerShape(4.dp))
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {

@@ -205,16 +205,16 @@ fun StartStopScreen(
                                 .background(
                                     Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0xFF2C384A),
-                                            Color(0xFF141B26),
-                                            Color(0xFF0D121A)
+                                            CockpitCardElevated,
+                                            CockpitCard,
+                                            CockpitSurfaceBorder
                                         )
                                     )
                                 )
                                 .border(
                                     width = 3.dp,
                                     brush = Brush.linearGradient(
-                                        listOf(CockpitSteel, Color(0xFF1A2230), CockpitSteel.copy(alpha = 0.5f))
+                                        listOf(CockpitSteel, CockpitCardElevated, CockpitSteel.copy(alpha = 0.5f))
                                     ),
                                     shape = CircleShape
                                 )
@@ -226,7 +226,7 @@ fun StartStopScreen(
                                 modifier = Modifier
                                     .size(86.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFF101620))
+                                    .background(CockpitCard)
                                     .border(
                                         width = 2.dp,
                                         color = if (isStartStopActive) CockpitGreen else CockpitRed.copy(alpha = 0.7f),

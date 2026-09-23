@@ -76,6 +76,26 @@ interface AutoVueApi {
     @POST("api/upload")
     suspend fun uploadDataset(@Part file: MultipartBody.Part): Any
 
+    // GPS Endpoints
+    @GET("api/route")
+    suspend fun getRoute(): com.example.model.RouteResponse
+
+    @GET("api/trip-summary")
+    suspend fun getTripSummary(): com.example.model.TripSummaryResponse
+
+    // DTC Endpoints
+    @GET("api/dtc")
+    suspend fun getDtcs(): com.example.model.DtcResponse
+
+    @POST("api/dtc")
+    suspend fun setDtcs(@Body request: com.example.model.DtcRequest): com.example.model.DtcResponse
+
+    @retrofit2.http.DELETE("api/dtc")
+    suspend fun clearDtcs(): com.example.model.DtcResponse
+
+    @retrofit2.http.DELETE("api/dtc/{code}")
+    suspend fun deleteDtc(@retrofit2.http.Path("code") code: String): com.example.model.DtcResponse
+
     @GET("health")
     suspend fun pingHealth(): Any
 }

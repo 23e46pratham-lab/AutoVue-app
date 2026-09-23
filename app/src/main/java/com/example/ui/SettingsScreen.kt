@@ -84,6 +84,8 @@ import com.example.model.NotificationSettings
 import com.example.ui.dialogs.AnomaliesHistoryDialog
 import com.example.ui.dialogs.AnomalyDetectedHorizontalBlock
 import com.example.ui.dialogs.ApiKeyInitializationDialog
+import com.example.ui.theme.AtherCyan
+import com.example.ui.theme.AtherMint
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
@@ -1067,7 +1069,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(CockpitCard)
-                .border(BorderStroke(1.dp, CardBorder))
+                .border(BorderStroke(0.75.dp, CardBorder))
                 .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
@@ -1084,7 +1086,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = tab.icon,
                         contentDescription = tab.title,
-                        tint = if (isSelected) CockpitSteel else TextMuted,
+                        tint = if (isSelected) AtherMint else TextMuted,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1092,8 +1094,8 @@ fun SettingsScreen(
                         modifier = Modifier
                             .height(3.dp)
                             .width(20.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(if (isSelected) CockpitSteel else Color.Transparent)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isSelected) AtherMint else Color.Transparent)
                     )
                 }
             }
