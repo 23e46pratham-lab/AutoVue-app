@@ -670,6 +670,7 @@ private fun FuelEfficiencyCard(fuel: FuelPredictionResponse) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f, fill = false),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -681,23 +682,28 @@ private fun FuelEfficiencyCard(fuel: FuelPredictionResponse) {
                     )
                     Text(
                         text = "Physics Fuel Consumption & Mileage",
-                        fontSize = 14.sp,
+                        fontSize = 13.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = AtherMint.copy(alpha = 0.15f),
-                    border = androidx.compose.foundation.BorderStroke(0.75.dp, AtherMint.copy(alpha = 0.4f))
+                    border = androidx.compose.foundation.BorderStroke(0.75.dp, AtherMint.copy(alpha = 0.4f)),
+                    modifier = Modifier.padding(start = 6.dp)
                 ) {
                     Text(
                         text = "Tier ${fuel.tier} • ${(fuel.method ?: "maf").uppercase(Locale.US)}",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = AtherMint,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
                 }
             }
@@ -782,23 +788,25 @@ private fun FeatureMetricCard(
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Text(
                 text = title,
-                fontSize = 10.sp,
+                fontSize = 9.5.sp,
                 fontWeight = FontWeight.Medium,
                 color = TextSecondary,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = value,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary,
                 maxLines = 1,
+                softWrap = false,
                 overflow = TextOverflow.Ellipsis
             )
         }

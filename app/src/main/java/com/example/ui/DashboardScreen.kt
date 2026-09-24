@@ -298,7 +298,8 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
                 border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(50)
+                shape = RoundedCornerShape(50),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Analytics,
@@ -306,13 +307,15 @@ fun DashboardScreen(
                     tint = AtherMint,
                     modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "INSIGHTS",
                     color = TextPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
@@ -321,7 +324,8 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
                 border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(50)
+                shape = RoundedCornerShape(50),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.LocalGasStation,
@@ -329,13 +333,15 @@ fun DashboardScreen(
                     tint = CockpitAmber,
                     modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "REFUEL",
                     color = TextPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
@@ -344,7 +350,8 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
                 border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
-                shape = RoundedCornerShape(50)
+                shape = RoundedCornerShape(50),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.HelpOutline,
@@ -352,13 +359,15 @@ fun DashboardScreen(
                     tint = CockpitSteel,
                     modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(5.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "GUIDE",
                     color = TextPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -472,13 +481,14 @@ private fun SimplifiedAlertBanner(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .padding(top = 2.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(borderColor.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center
@@ -493,50 +503,63 @@ private fun SimplifiedAlertBanner(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = activeAlert.title,
                             color = borderColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Black
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.weight(1f, fill = false),
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                         Box(
                             modifier = Modifier
+                                .padding(start = 6.dp)
                                 .clip(RoundedCornerShape(4.dp))
                                 .background(borderColor.copy(alpha = 0.3f))
-                                .padding(horizontal = 5.dp, vertical = 2.dp)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = if (isCritical) "CRITICAL" else "WARNING",
                                 color = borderColor,
                                 fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
 
                     Text(
                         text = activeAlert.message,
                         color = TextPrimary,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 16.sp
                     )
+
+                    Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
                         text = "Action: ${activeAlert.actionAdvice}",
                         color = TextSecondary,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Normal
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 14.sp
                     )
                 }
 
                 IconButton(
                     onClick = onDismiss,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .padding(top = 2.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,

@@ -29,9 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.LocalGasStation
@@ -39,6 +37,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -61,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -69,19 +69,26 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.components.CarbonFiberPanel
+import com.example.components.UrusRacingStripe
+import com.example.components.carbonFiberPattern
 import com.example.model.UserProfileItem
 import com.example.model.VehicleProfile
-import com.example.ui.theme.CardBorder
-import com.example.ui.theme.CockpitAmber
+import com.example.ui.theme.CarbonBorder
+import com.example.ui.theme.CarbonDarkBackground
+import com.example.ui.theme.CarbonSurface
+import com.example.ui.theme.CarbonSurfaceElevated
+import com.example.ui.theme.CarbonTextMuted
+import com.example.ui.theme.CarbonTextPrimary
+import com.example.ui.theme.CarbonTextSecondary
 import com.example.ui.theme.CockpitBackground
-import com.example.ui.theme.CockpitCard
-import com.example.ui.theme.CockpitCardElevated
 import com.example.ui.theme.CockpitGreen
-import com.example.ui.theme.CockpitSteel
-import com.example.ui.theme.CockpitSurfaceBorder
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LamboCarbonBlack
+import com.example.ui.theme.LamboYellow
+import com.example.ui.theme.LamboYellowBright
+import com.example.ui.theme.LamboYellowDark
+import com.example.ui.theme.LamboYellowGlow
+import com.example.ui.theme.LamboYellowSubtle
 import com.example.viewmodel.SharedTelemetryViewModel
 
 enum class OnboardingOption {
@@ -98,8 +105,6 @@ fun UserOnboardingScreen(
     val selectedUserId by viewModel.selectedUserId.collectAsState()
 
     var selectedOption by remember { mutableStateOf(OnboardingOption.EXISTING_USER) }
-    var newUserName by remember { mutableStateOf("") }
-    var newUserVehicle by remember { mutableStateOf("Seat Leon 1.6 FSI") }
     var activeChosenUser by remember(selectedUserId, userProfiles) {
         mutableStateOf(userProfiles.find { it.id == selectedUserId } ?: userProfiles.firstOrNull())
     }
@@ -107,7 +112,7 @@ fun UserOnboardingScreen(
     // Two-page registration wizard state variables
     var registrationStep by remember { mutableIntStateOf(1) } // 1: Profile & Engine, 2: Dynamics & Tank
 
-    // Page 1 Inputs (Matching Screenshot 1)
+    // Page 1 Inputs
     var profileNameInput by remember { mutableStateOf("pratham") }
     var fuelSupplyInput by remember { mutableStateOf("gasoline") }
     var startStopEquippedInput by remember { mutableStateOf(false) }
@@ -116,7 +121,7 @@ fun UserOnboardingScreen(
     var odometerKmInput by remember { mutableStateOf("59477.00") }
     var isActiveProfileInput by remember { mutableStateOf(true) }
 
-    // Page 2 Inputs (Matching Screenshot 2)
+    // Page 2 Inputs
     var totalWeightKgInput by remember { mutableStateOf("1250.0") }
     var consumptionL100kmInput by remember { mutableStateOf("6.5") }
     var correctiveConsumptionInput by remember { mutableStateOf("1.0") }
@@ -131,135 +136,171 @@ fun UserOnboardingScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
+            .padding(horizontal = 20.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // Branding & Header
-        Box(
+        // Carbon Fibre Hero Header with Lamborghini Urus Yellow Racing Accents
+        CarbonFiberPanel(
             modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(CockpitSteel.copy(alpha = 0.25f), CockpitCardElevated)
-                    )
-                )
-                .border(1.5.dp, CockpitSteel, CircleShape),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .shadow(8.dp, RoundedCornerShape(16.dp)),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.5.dp, LamboYellow),
+            hasYellowAccent = true
         ) {
-            Icon(
-                imageVector = Icons.Default.Speed,
-                contentDescription = "AutoVue Logo",
-                tint = CockpitSteel,
-                modifier = Modifier.size(38.dp)
-            )
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 18.dp, horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Lamborghini Urus Giallo Auge Top Accent Stripe
+                UrusRacingStripe(
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .clip(RoundedCornerShape(2.dp)),
+                    thickness = 3.dp
+                )
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "AutoVue",
-                    color = TextPrimary,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+                // Carbon + Urus Yellow Tachometer/Speed Emblem
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(CockpitSteel.copy(alpha = 0.18f))
-                        .border(1.dp, CockpitSteel.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .size(68.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.radialGradient(
+                                colors = listOf(
+                                    LamboYellow.copy(alpha = 0.28f),
+                                    CarbonDarkBackground
+                                )
+                            )
+                        )
+                        .border(2.dp, LamboYellow, CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = "AutoVue Telemetry Logo",
+                        tint = LamboYellowBright,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Brand & Telemetry Badge
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "AutoVue",
+                            color = CarbonTextPrimary,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.2.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(LamboYellow)
+                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "GIALLO OBD-II",
+                                color = LamboCarbonBlack,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
+                    }
+
                     Text(
-                        text = "OBD-II",
-                        color = CockpitSteel,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "Super-SUV Telemetry & High Performance Diagnostics",
+                        color = LamboYellowBright,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text = "Select driver profile to initialize vehicle cockpit",
+                        color = CarbonTextSecondary,
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
-
-            Text(
-                text = "Vehicle Telemetry & Diagnostics",
-                color = TextSecondary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-
-            Text(
-                text = "Select a profile option to get started",
-                color = TextMuted,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center
-            )
         }
 
-        // Two Main Options: Add New User or Existing User
+        // Two Main Selector Cards with Carbon Fibre Weave & Urus Yellow Active Highlighting
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Option 1: Existing User
+            // Option 1: Existing User Card (Carbon Fibre)
             val isExistingSelected = selectedOption == OnboardingOption.EXISTING_USER
-            Card(
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .carbonFiberPattern()
+                    .border(
+                        BorderStroke(
+                            width = if (isExistingSelected) 2.dp else 1.dp,
+                            color = if (isExistingSelected) LamboYellow else CarbonBorder
+                        ),
+                        RoundedCornerShape(14.dp)
+                    )
                     .clickable { selectedOption = OnboardingOption.EXISTING_USER }
-                    .testTag("existing_user_option_card"),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isExistingSelected) CockpitCardElevated else CockpitCard
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = if (isExistingSelected) 2.dp else 1.dp,
-                    color = if (isExistingSelected) CockpitSteel else CardBorder
-                )
+                    .testTag("existing_user_option_card")
+                    .padding(14.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(42.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isExistingSelected) CockpitSteel.copy(alpha = 0.2f)
-                                else CockpitBackground
+                                if (isExistingSelected) LamboYellow.copy(alpha = 0.22f)
+                                else CarbonDarkBackground
+                            )
+                            .border(
+                                1.dp,
+                                if (isExistingSelected) LamboYellow else CarbonBorder,
+                                CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Existing User",
-                            tint = if (isExistingSelected) CockpitSteel else TextSecondary,
+                            tint = if (isExistingSelected) LamboYellowBright else CarbonTextSecondary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
                     Text(
-                        text = "Existing User",
-                        color = if (isExistingSelected) TextPrimary else TextSecondary,
+                        text = "Existing Driver",
+                        color = if (isExistingSelected) Color.White else CarbonTextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
 
                     Text(
-                        text = "Continue with saved driver",
-                        color = TextMuted,
+                        text = "Continue with saved vehicle",
+                        color = if (isExistingSelected) LamboYellowBright.copy(alpha = 0.9f) else CarbonTextMuted,
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center,
                         lineHeight = 13.sp
@@ -267,59 +308,63 @@ fun UserOnboardingScreen(
                 }
             }
 
-            // Option 2: Add New User
+            // Option 2: Add New User Card (Carbon Fibre)
             val isNewUserSelected = selectedOption == OnboardingOption.ADD_NEW_USER
-            Card(
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .carbonFiberPattern()
+                    .border(
+                        BorderStroke(
+                            width = if (isNewUserSelected) 2.dp else 1.dp,
+                            color = if (isNewUserSelected) LamboYellow else CarbonBorder
+                        ),
+                        RoundedCornerShape(14.dp)
+                    )
                     .clickable { selectedOption = OnboardingOption.ADD_NEW_USER }
-                    .testTag("add_user_option_card"),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isNewUserSelected) CockpitCardElevated else CockpitCard
-                ),
-                border = androidx.compose.foundation.BorderStroke(
-                    width = if (isNewUserSelected) 2.dp else 1.dp,
-                    color = if (isNewUserSelected) CockpitSteel else CardBorder
-                )
+                    .testTag("add_user_option_card")
+                    .padding(14.dp)
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(42.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isNewUserSelected) CockpitSteel.copy(alpha = 0.2f)
-                                else CockpitBackground
+                                if (isNewUserSelected) LamboYellow.copy(alpha = 0.22f)
+                                else CarbonDarkBackground
+                            )
+                            .border(
+                                1.dp,
+                                if (isNewUserSelected) LamboYellow else CarbonBorder,
+                                CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PersonAdd,
-                            contentDescription = "Add New User",
-                            tint = if (isNewUserSelected) CockpitSteel else TextSecondary,
+                            contentDescription = "Add New Driver",
+                            tint = if (isNewUserSelected) LamboYellowBright else CarbonTextSecondary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
                     Text(
-                        text = "Add New User",
-                        color = if (isNewUserSelected) TextPrimary else TextSecondary,
+                        text = "New Driver",
+                        color = if (isNewUserSelected) Color.White else CarbonTextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
 
                     Text(
-                        text = "Create new driver profile",
-                        color = TextMuted,
+                        text = "Create telemetry profile",
+                        color = if (isNewUserSelected) LamboYellowBright.copy(alpha = 0.9f) else CarbonTextMuted,
                         fontSize = 10.sp,
                         textAlign = TextAlign.Center,
                         lineHeight = 13.sp
@@ -340,37 +385,47 @@ fun UserOnboardingScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = "Select an existing profile:",
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp, 16.dp)
+                                    .background(LamboYellow, RoundedCornerShape(2.dp))
+                            )
+                            Text(
+                                text = "SELECT DRIVER PROFILE",
+                                color = LamboYellowDark,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
 
-                        // List existing profiles
+                        // List existing profiles in Carbon Fibre Cards
                         userProfiles.forEach { profile ->
                             val isChosen = activeChosenUser?.id == profile.id
-                            Card(
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .carbonFiberPattern()
+                                    .border(
+                                        BorderStroke(
+                                            if (isChosen) 1.5.dp else 1.dp,
+                                            if (isChosen) LamboYellow else CarbonBorder
+                                        ),
+                                        RoundedCornerShape(12.dp)
+                                    )
                                     .clickable {
                                         activeChosenUser = profile
                                     }
-                                    .testTag("existing_user_item_${profile.name.lowercase()}"),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isChosen) CockpitCardElevated else CockpitCard
-                                ),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    if (isChosen) CockpitSteel else CardBorder
-                                )
+                                    .testTag("existing_user_item_${profile.name.lowercase()}")
+                                    .padding(14.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(14.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
@@ -380,30 +435,35 @@ fun UserOnboardingScreen(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(42.dp)
+                                                .size(44.dp)
                                                 .clip(CircleShape)
                                                 .background(
-                                                    if (isChosen) CockpitSteel.copy(alpha = 0.25f)
-                                                    else CockpitSurfaceBorder
+                                                    if (isChosen) LamboYellow.copy(alpha = 0.22f)
+                                                    else CarbonDarkBackground
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (isChosen) LamboYellow else CarbonBorder,
+                                                    CircleShape
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.DirectionsCar,
                                                 contentDescription = null,
-                                                tint = if (isChosen) CockpitSteel else TextMuted,
-                                                modifier = Modifier.size(22.dp)
+                                                tint = if (isChosen) LamboYellowBright else CarbonTextMuted,
+                                                modifier = Modifier.size(24.dp)
                                             )
                                         }
 
                                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
                                                 Text(
                                                     text = profile.name,
-                                                    color = TextPrimary,
+                                                    color = CarbonTextPrimary,
                                                     fontSize = 15.sp,
                                                     fontWeight = FontWeight.Bold
                                                 )
@@ -411,12 +471,13 @@ fun UserOnboardingScreen(
                                                     Box(
                                                         modifier = Modifier
                                                             .clip(RoundedCornerShape(4.dp))
-                                                            .background(CockpitGreen.copy(alpha = 0.15f))
+                                                            .background(LamboYellow.copy(alpha = 0.2f))
+                                                            .border(1.dp, LamboYellow.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
                                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                                     ) {
                                                         Text(
                                                             text = "DEFAULT",
-                                                            color = CockpitGreen,
+                                                            color = LamboYellowBright,
                                                             fontSize = 9.sp,
                                                             fontWeight = FontWeight.Bold
                                                         )
@@ -425,18 +486,18 @@ fun UserOnboardingScreen(
                                             }
                                             Text(
                                                 text = profile.vehicleModel,
-                                                color = TextSecondary,
+                                                color = CarbonTextSecondary,
                                                 fontSize = 12.sp
                                             )
                                         }
                                     }
 
-                                    // Checkmark
+                                    // Urus Yellow Selection Checkmark
                                     if (isChosen) {
                                         Icon(
                                             imageVector = Icons.Default.CheckCircle,
                                             contentDescription = "Selected",
-                                            tint = CockpitSteel,
+                                            tint = LamboYellowBright,
                                             modifier = Modifier.size(24.dp)
                                         )
                                     }
@@ -444,9 +505,9 @@ fun UserOnboardingScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        // Continue Button
+                        // Continue as Selected Driver Button in Lamborghini Urus Yellow with bold black text
                         Button(
                             onClick = {
                                 activeChosenUser?.let {
@@ -456,34 +517,41 @@ fun UserOnboardingScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp)
+                                .height(54.dp)
+                                .shadow(6.dp, RoundedCornerShape(12.dp))
                                 .testTag("existing_user_continue_button"),
-                            colors = ButtonDefaults.buttonColors(containerColor = CockpitSteel),
-                            shape = RoundedCornerShape(10.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = LamboYellow,
+                                contentColor = LamboCarbonBlack
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Text(
-                                text = "Continue as ${activeChosenUser?.name ?: "Driver"}",
-                                color = TextPrimary,
+                                text = "Launch Cockpit as ${activeChosenUser?.name ?: "Driver"}",
+                                color = LamboCarbonBlack,
                                 fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = null,
-                                tint = TextPrimary,
-                                modifier = Modifier.size(18.dp)
+                                tint = LamboCarbonBlack,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
                 OnboardingOption.ADD_NEW_USER -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = CockpitCard),
-                        border = BorderStroke(1.dp, CardBorder)
+                    // Registration Card with Carbon Fibre Weave and Urus Yellow Styling
+                    CarbonFiberPanel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(6.dp, RoundedCornerShape(14.dp)),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, CarbonBorder)
                     ) {
                         Column(
                             modifier = Modifier
@@ -491,7 +559,7 @@ fun UserOnboardingScreen(
                                 .padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
-                            // Step Header & Progress Bar
+                            // Step Header & Urus Yellow Progress Bar
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -500,13 +568,13 @@ fun UserOnboardingScreen(
                                 Column {
                                     Text(
                                         text = if (registrationStep == 1) "Profile & Engine Setup" else "Dynamics & Fuel Setup",
-                                        color = TextPrimary,
+                                        color = CarbonTextPrimary,
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         text = "Page $registrationStep of 2",
-                                        color = CockpitSteel,
+                                        color = LamboYellowBright,
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
@@ -516,44 +584,46 @@ fun UserOnboardingScreen(
                                     Box(
                                         modifier = Modifier
                                             .height(5.dp)
-                                            .width(26.dp)
+                                            .width(28.dp)
                                             .clip(RoundedCornerShape(3.dp))
-                                            .background(CockpitSteel)
+                                            .background(LamboYellow)
                                     )
                                     Box(
                                         modifier = Modifier
                                             .height(5.dp)
-                                            .width(26.dp)
+                                            .width(28.dp)
                                             .clip(RoundedCornerShape(3.dp))
-                                            .background(if (registrationStep == 2) CockpitSteel else CockpitSurfaceBorder)
+                                            .background(if (registrationStep == 2) LamboYellow else CarbonBorder)
                                     )
                                 }
                             }
 
                             if (registrationStep == 1) {
-                                // ====== PAGE 1: Profile & Engine Setup (Screenshot 1) ======
+                                // ====== PAGE 1: Profile & Engine Setup ======
 
                                 // 1. Profile name*
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = profileNameInput,
                                         onValueChange = { if (it.length <= 8) profileNameInput = it },
-                                        label = { Text("Profile name*", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("pratham", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Profile name*", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("pratham", color = CarbonTextMuted, fontSize = 13.sp) },
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("profile_name_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
                                         text = "enter profile name (up to 8 characters).",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -561,7 +631,7 @@ fun UserOnboardingScreen(
 
                                 // 2. Fuel supply*
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("Fuel supply*", color = TextMuted, fontSize = 12.sp)
+                                    Text("Fuel supply*", color = CarbonTextSecondary, fontSize = 12.sp)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -572,28 +642,28 @@ fun UserOnboardingScreen(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isFuelChosen) CockpitSteel.copy(alpha = 0.25f) else CockpitCardElevated)
+                                                    .background(if (isFuelChosen) LamboYellow else CarbonDarkBackground)
                                                     .border(
                                                         1.dp,
-                                                        if (isFuelChosen) CockpitSteel else CockpitSurfaceBorder,
+                                                        if (isFuelChosen) LamboYellowBright else CarbonBorder,
                                                         RoundedCornerShape(8.dp)
                                                     )
                                                     .clickable { fuelSupplyInput = type }
-                                                    .padding(vertical = 8.dp),
+                                                    .padding(vertical = 9.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = type,
-                                                    color = if (isFuelChosen) TextPrimary else TextSecondary,
+                                                    color = if (isFuelChosen) LamboCarbonBlack else CarbonTextSecondary,
                                                     fontSize = 11.sp,
-                                                    fontWeight = if (isFuelChosen) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (isFuelChosen) FontWeight.Black else FontWeight.Normal
                                                 )
                                             }
                                         }
                                     }
                                     Text(
                                         text = "select the engine type.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -601,7 +671,7 @@ fun UserOnboardingScreen(
 
                                 // 3. Start and stop*
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text("Start and stop*", color = TextMuted, fontSize = 12.sp)
+                                    Text("Start and stop*", color = CarbonTextSecondary, fontSize = 12.sp)
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -612,28 +682,28 @@ fun UserOnboardingScreen(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (isSelected) CockpitSteel.copy(alpha = 0.25f) else CockpitCardElevated)
+                                                    .background(if (isSelected) LamboYellow else CarbonDarkBackground)
                                                     .border(
                                                         1.dp,
-                                                        if (isSelected) CockpitSteel else CockpitSurfaceBorder,
+                                                        if (isSelected) LamboYellowBright else CarbonBorder,
                                                         RoundedCornerShape(8.dp)
                                                     )
                                                     .clickable { startStopEquippedInput = equipped }
-                                                    .padding(vertical = 8.dp),
+                                                    .padding(vertical = 9.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = label,
-                                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                                    color = if (isSelected) LamboCarbonBlack else CarbonTextSecondary,
                                                     fontSize = 12.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal
                                                 )
                                             }
                                         }
                                     }
                                     Text(
                                         text = "Does your engine equip with start-stop system.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -644,23 +714,25 @@ fun UserOnboardingScreen(
                                     OutlinedTextField(
                                         value = displacementCcInput,
                                         onValueChange = { displacementCcInput = it },
-                                        label = { Text("Displacement (cc)*", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("1700", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Displacement (cc)*", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("1700", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("displacement_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
                                         text = "enter the engine displacement in cubic centimeters (liters x 1000). For example, a 2 liters engine you have to enter 2000.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -671,23 +743,25 @@ fun UserOnboardingScreen(
                                     OutlinedTextField(
                                         value = maxPowerHpInput,
                                         onValueChange = { maxPowerHpInput = it },
-                                        label = { Text("Max power (HP)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("89.0", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Max power (HP)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("89.0", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("max_power_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
                                         text = "you can insert the engine peak power.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -698,23 +772,25 @@ fun UserOnboardingScreen(
                                     OutlinedTextField(
                                         value = odometerKmInput,
                                         onValueChange = { odometerKmInput = it },
-                                        label = { Text("Odometer (km)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("59477.00", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Odometer (km)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("59477.00", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("odometer_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
                                         text = "enter the distance shown by the odometer (odometer) located on the dashboard of the car.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -730,20 +806,21 @@ fun UserOnboardingScreen(
                                             checked = isActiveProfileInput,
                                             onCheckedChange = { isActiveProfileInput = it },
                                             colors = CheckboxDefaults.colors(
-                                                checkedColor = CockpitSteel,
-                                                checkmarkColor = TextPrimary
+                                                checkedColor = LamboYellow,
+                                                checkmarkColor = LamboCarbonBlack,
+                                                uncheckedColor = CarbonBorder
                                             )
                                         )
                                         Text(
-                                            text = "Active",
-                                            color = TextPrimary,
+                                            text = "Active Profile",
+                                            color = CarbonTextPrimary,
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
                                     Text(
                                         text = "all movement data will be associated with the active profile.",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp,
                                         modifier = Modifier.padding(start = 12.dp)
@@ -752,152 +829,151 @@ fun UserOnboardingScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                // Continue to Page 2 Button
+                                // Continue to Page 2 Button in Urus Yellow
                                 val canProceed = profileNameInput.trim().isNotEmpty()
                                 Button(
                                     onClick = { registrationStep = 2 },
                                     enabled = canProceed,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(50.dp)
+                                        .height(52.dp)
+                                        .shadow(6.dp, RoundedCornerShape(12.dp))
                                         .testTag("onboarding_next_page_button"),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = CockpitSteel,
-                                        disabledContainerColor = CockpitSteel.copy(alpha = 0.3f)
+                                        containerColor = LamboYellow,
+                                        disabledContainerColor = LamboYellow.copy(alpha = 0.35f)
                                     ),
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Text(
                                         text = "Next: Dynamics & Fuel (Page 2)",
-                                        color = if (canProceed) TextPrimary else TextMuted,
+                                        color = if (canProceed) LamboCarbonBlack else CarbonTextMuted,
                                         fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Black
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                         contentDescription = null,
-                                        tint = if (canProceed) TextPrimary else TextMuted,
+                                        tint = if (canProceed) LamboCarbonBlack else CarbonTextMuted,
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
 
                             } else {
-                                // ====== PAGE 2: Dynamics, Consumption & Tank Specs (Screenshot 2) ======
+                                // ====== PAGE 2: Dynamics, Consumption & Tank Specs ======
 
                                 // 1. Total weight (KG)
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = totalWeightKgInput,
                                         onValueChange = { totalWeightKgInput = it },
-                                        label = { Text("Total weight (KG)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("1250.0", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Total weight (KG)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("1250.0", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("weight_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
                                         text = "If you get wrong power and torque data, you can insert the total weight for better calculations: empty weight + weight of the fuel and driver of all the masses on board. Weight in kg = lbs * 2.20462",
-                                        color = TextMuted,
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
                                 }
 
-                                // 2. Consump. (L/100km)
+                                // 2. Reference consumption (liters/100km)
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = consumptionL100kmInput,
                                         onValueChange = { consumptionL100kmInput = it },
-                                        label = { Text("Consump. (L/100km)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("6.5", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Reference consumption (liters/100km)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("6.5", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("consumption_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
-                                        text = "you can enter the average fuel consumption (under standard conditions).",
-                                        color = TextMuted,
+                                        text = "insert the estimated average consumption in liters per 100km. If you prefer, you can use the values specified by the manufacturer.",
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
                                 }
 
-                                // 3. Corrective consumption with Lightning Bolt icon
+                                // 3. Corrective consumption factor
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = correctiveConsumptionInput,
                                         onValueChange = { correctiveConsumptionInput = it },
-                                        label = { Text("Corrective consumption", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("1.0", color = TextMuted, fontSize = 13.sp) },
-                                        trailingIcon = {
-                                            IconButton(onClick = { correctiveConsumptionInput = "1.0" }) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Bolt,
-                                                    contentDescription = "Estimate divider",
-                                                    tint = CockpitAmber,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        },
+                                        label = { Text("Corrective consumption factor", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("1.0", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .testTag("corrective_consumption_input"),
+                                            .testTag("corrective_factor_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
-                                        text = "Divider corrective to fix consumption. For example, if Smart Control calculates 60 mpg of consumption but your car has 30 mpg, you must set 2.0 value (60/30). Push the button in the shape of lightning to estimate the divider according to the refuelings or the expected consumption set to the car profile.",
-                                        color = TextMuted,
+                                        text = "if the instant consumption value doesn't match the trip computer, you can insert a correction factor. For example, if instant consumption value is 10% lower than trip computer, the factor is 1.10. Default is 1.",
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
                                 }
 
-                                // 4. Tank capacity (l)
+                                // 4. Tank capacity (liters)
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = tankCapacityLitersInput,
                                         onValueChange = { tankCapacityLitersInput = it },
-                                        label = { Text("Tank capacity (l)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("45.0", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Tank capacity (liters)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("45.0", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("tank_capacity_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
-                                        text = "you can insert the tank capacity.",
-                                        color = TextMuted,
+                                        text = "insert the tank capacity in liters. 1 gallon = 3.785 liters, 1 UK gallon = 4.546 liters.",
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
@@ -908,57 +984,61 @@ fun UserOnboardingScreen(
                                     OutlinedTextField(
                                         value = fuelLeftPercentInput,
                                         onValueChange = { fuelLeftPercentInput = it },
-                                        label = { Text("Fuel left (%)", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("24.00", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("Fuel left (%)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("24.00", color = CarbonTextMuted, fontSize = 13.sp) },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("fuel_left_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
-                                        text = "you can insert the current fuel percentage in your tank (100% full).",
-                                        color = TextMuted,
+                                        text = "it's the fuel level in the tank in percentage. 100% full, 50% half.",
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
                                 }
 
-                                // 6. VIN
+                                // 6. VIN / Chassis Number
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     OutlinedTextField(
                                         value = vinInput,
                                         onValueChange = { vinInput = it },
-                                        label = { Text("VIN", color = TextMuted, fontSize = 12.sp) },
-                                        placeholder = { Text("WVWZZZ3CZWE098124", color = TextMuted, fontSize = 13.sp) },
+                                        label = { Text("VIN (Vehicle Identification Number)", color = CarbonTextSecondary, fontSize = 12.sp) },
+                                        placeholder = { Text("WVWZZZ3CZWE098124", color = CarbonTextMuted, fontSize = 13.sp) },
                                         singleLine = true,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .testTag("vin_input"),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedTextColor = TextPrimary,
-                                            unfocusedTextColor = TextPrimary,
-                                            focusedBorderColor = CockpitSteel,
-                                            unfocusedBorderColor = CockpitSurfaceBorder
+                                            focusedTextColor = CarbonTextPrimary,
+                                            unfocusedTextColor = CarbonTextPrimary,
+                                            focusedBorderColor = LamboYellow,
+                                            unfocusedBorderColor = CarbonBorder,
+                                            focusedContainerColor = CarbonDarkBackground,
+                                            unfocusedContainerColor = CarbonDarkBackground
                                         )
                                     )
                                     Text(
-                                        text = "you can insert the Vehicle Identification Number (VIN).",
-                                        color = TextMuted,
+                                        text = "optional vehicle chassis identification code.",
+                                        color = CarbonTextMuted,
                                         fontSize = 11.sp,
                                         lineHeight = 14.sp
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
 
-                                // Actions: Back to Page 1 & Save Profile (Screenshot 2 Save Floppy icon)
+                                // Wizard Navigation Buttons (Back & Complete Registration)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -966,25 +1046,27 @@ fun UserOnboardingScreen(
                                     OutlinedButton(
                                         onClick = { registrationStep = 1 },
                                         modifier = Modifier
-                                            .weight(0.38f)
-                                            .height(50.dp),
-                                        border = BorderStroke(1.dp, CockpitSurfaceBorder),
-                                        shape = RoundedCornerShape(10.dp)
+                                            .weight(1f)
+                                            .height(52.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        border = BorderStroke(1.dp, CarbonBorder),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = CarbonTextPrimary
+                                        )
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                             contentDescription = "Back",
-                                            tint = TextSecondary,
-                                            modifier = Modifier.size(16.dp)
+                                            modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(text = "Page 1", color = TextSecondary, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Back", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                     }
 
                                     Button(
                                         onClick = {
                                             val newProfile = VehicleProfile(
-                                                profileName = profileNameInput.trim().ifEmpty { "Driver" },
+                                                profileName = profileNameInput.ifBlank { "pratham" },
                                                 fuelSupply = fuelSupplyInput,
                                                 startAndStopEquipped = startStopEquippedInput,
                                                 displacementCc = displacementCcInput.toIntOrNull() ?: 1700,
@@ -995,31 +1077,35 @@ fun UserOnboardingScreen(
                                                 correctiveConsumption = correctiveConsumptionInput.toDoubleOrNull() ?: 1.0,
                                                 tankCapacityLiters = tankCapacityLitersInput.toDoubleOrNull() ?: 45.0,
                                                 fuelLeftPercent = fuelLeftPercentInput.toDoubleOrNull() ?: 24.0,
-                                                vin = vinInput.trim().ifEmpty { "WVWZZZ3CZWE098124" },
+                                                vin = vinInput.ifBlank { "WVWZZZ3CZWE098124" },
                                                 isActive = isActiveProfileInput
                                             )
                                             viewModel.registerNewUserWithProfile(newProfile)
                                             onNavigateToDashboard()
                                         },
                                         modifier = Modifier
-                                            .weight(0.62f)
-                                            .height(50.dp)
-                                            .testTag("save_user_profile_button"),
-                                        colors = ButtonDefaults.buttonColors(containerColor = CockpitSteel),
-                                        shape = RoundedCornerShape(10.dp)
+                                            .weight(1.5f)
+                                            .height(52.dp)
+                                            .shadow(6.dp, RoundedCornerShape(12.dp))
+                                            .testTag("save_and_launch_cockpit_button"),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = LamboYellow,
+                                            contentColor = LamboCarbonBlack
+                                        ),
+                                        shape = RoundedCornerShape(12.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Save,
-                                            contentDescription = "Save",
-                                            tint = TextPrimary,
+                                            contentDescription = null,
+                                            tint = LamboCarbonBlack,
                                             modifier = Modifier.size(18.dp)
                                         )
-                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Save Profile",
-                                            color = TextPrimary,
+                                            text = "Save & Launch",
+                                            color = LamboCarbonBlack,
                                             fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
+                                            fontWeight = FontWeight.Black
                                         )
                                     }
                                 }
@@ -1029,18 +1115,5 @@ fun UserOnboardingScreen(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Subtle Guest / Quick access fallback
-        Text(
-            text = "Skip to Dashboard as Guest",
-            color = TextMuted,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .clickable { onNavigateToDashboard() }
-                .padding(8.dp)
-        )
     }
 }

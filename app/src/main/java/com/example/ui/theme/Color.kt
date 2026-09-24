@@ -32,6 +32,34 @@ val CockpitSteel = Color(0xFF5A4838)         // Burnished bronze / deep saddle s
 val CockpitBlueGrey = Color(0xFF8C7E70)      // Muted warm slate for inactive icons
 val CockpitGaugeTrack = Color(0xFFE7DECf)    // Warm sand gauge backing track
 
+// Lamborghini Urus Yellow Palette (Giallo Auge / Giallo Inti Hypercar Spec)
+val LamboYellow = Color(0xFFFFD700)           // Authentic Lamborghini Giallo Auge
+val LamboYellowBright = Color(0xFFFFEA00)     // High-voltage luminous Urus yellow
+val LamboYellowDark = Color(0xFFC79800)       // Deep golden racing accent
+val LamboYellowSubtle = Color(0x25FFD700)     // Subtle Urus yellow tint
+val LamboYellowGlow = Color(0x44FFEA00)       // Hypercar yellow glow
+val LamboCarbonBlack = Color(0xFF111215)      // Urus Nero Noctis black contrast
+
+// Aliases for compatibility
+val FerrariRed = LamboYellow
+val FerrariRedBright = LamboYellowBright
+val FerrariRedDark = LamboYellowDark
+val FerrariRedSubtle = LamboYellowSubtle
+val FerrariRedGlow = LamboYellowGlow
+val FerrariYellow = LamboYellowBright
+
+// Carbon Fibre Composite Palette
+val CarbonDarkBackground = Color(0xFF0D0E10) // Deep carbon chassis background
+val CarbonWeaveDark = Color(0xFF141619)      // Twill weave dark bundle
+val CarbonWeaveLight = Color(0xFF22252A)     // Twill weave lit reflection bundle
+val CarbonWeaveHighlight = Color(0xFF32363E) // Specular weave lacquer sheen
+val CarbonSurface = Color(0xFF181A1E)        // Carbon fiber composite card surface
+val CarbonSurfaceElevated = Color(0xFF21242A)// Elevated carbon fiber card surface
+val CarbonBorder = Color(0xFF333842)         // Carbon rim border
+val CarbonTextPrimary = Color(0xFFF5F5F7)    // Pure racing white text on carbon
+val CarbonTextSecondary = Color(0xFFA0A6B2)  // Cool metallic silver secondary text
+val CarbonTextMuted = Color(0xFF6B7280)      // Slate muted text
+
 val Indigo400 = Color(0xFF6366F1)
 val Indigo500 = Color(0xFF4F46E5)
 val Indigo900 = Color(0xFFE8EAFF)
@@ -46,4 +74,7 @@ val StatusRed = Color(0xFFDC2626)
 val StatusBlue = Color(0xFF0284C7)
 
 val Slate800 = Color(0xFFF0E8DC)             // Light cream elevated container tint
+
+val AtherCyan = Color(0xFF00D2B4)
+val AtherMint = Color(0xFF00E599)
 

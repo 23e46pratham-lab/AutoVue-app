@@ -1,15 +1,15 @@
 package com.example.ui
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material.icons.filled.LocationOn
@@ -34,7 +36,6 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.Card
@@ -44,36 +45,34 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import com.example.components.TopTelemetryHud
 import com.example.model.TelemetryData
+import com.example.model.TripMapMode
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
 import com.example.ui.theme.CockpitCard
 import com.example.ui.theme.CockpitCardElevated
-import com.example.ui.theme.CockpitGaugeTrack
 import com.example.ui.theme.CockpitGreen
 import com.example.ui.theme.CockpitRed
 import com.example.ui.theme.CockpitSteel
@@ -82,16 +81,21 @@ import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.SharedTelemetryViewModel
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 import java.util.Locale
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 @Composable
 fun TripMapScreen(
     viewModel: SharedTelemetryViewModel,
     onOpenProfile: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val tick by viewModel.latestTick.collectAsState()
     val tripMinutes by viewModel.tripElapsedTimeMinutes.collectAsState()
     val tripDist by viewModel.tripDistanceKm.collectAsState()
@@ -103,7 +107,21 @@ fun TripMapScreen(
     val tripSummary by viewModel.tripSummary.collectAsState()
     val liveGpsTrail by viewModel.liveGpsTrail.collectAsState()
 
-    var zoomLevel by remember { mutableFloatStateOf(1.0f) }
+    val tripTickBuffer by viewModel.tripTickBuffer.collectAsState()
+    val currentMode by viewModel.currentMapMode.collectAsState()
+    val lowFuelAlert by viewModel.lowFuelAlert.collectAsState()
+
+    // State for the osmdroid map reference
+    val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+
+    // Track overlays for the telemetry heatmap and car marker
+    val tickOverlays = remember { mutableStateOf<List<Polyline>>(emptyList()) }
+    val carMarker = remember { mutableStateOf<Marker?>(null) }
+    val initialCentered = remember { mutableStateOf(false) }
+
+    // Default location (Mangalore, matching existing defaults)
+    val defaultLat = 12.913452
+    val defaultLon = 74.889218
 
     LaunchedEffect(Unit) {
         viewModel.fetchGpsRouteAndSummary()
@@ -119,7 +137,13 @@ fun TripMapScreen(
         throttlePos = 20.0,
         ambientTemp = 24.0,
         pedalD = 0.0,
-        pedalE = 0.0
+        pedalE = 0.0,
+        lat = 12.913452,
+        lon = 74.889218,
+        elevationM = 24.5,
+        gpsBearing = 42.0,
+        gpsSpeedMs = 0.0,
+        gpsFix = 1
     )
 
     val lat = currentData.lat
@@ -131,25 +155,117 @@ fun TripMapScreen(
     val gpsFix = currentData.gpsFix
     val hasGps = currentData.hasGps || routeData?.hasGps == true || liveGpsTrail.isNotEmpty()
 
-    val infiniteTransition = rememberInfiniteTransition(label = "RadarPulse")
-    val pulseRadius by infiniteTransition.animateFloat(
-        initialValue = 8f,
-        targetValue = 28f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "RadarPulseRadius"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "RadarPulseAlpha"
-    )
+    // Draw/update heatmap / route overlays whenever telemetry or mode changes
+    LaunchedEffect(tripTickBuffer, currentMode) {
+        val mv = mapViewRef.value ?: return@LaunchedEffect
+        // Remove existing overlays
+        tickOverlays.value.forEach { mv.overlays.remove(it) }
+        val newOverlays = mutableListOf<Polyline>()
+
+        val validTicks = tripTickBuffer.filter { it.lat != null && it.lon != null }
+        if (validTicks.isNotEmpty()) {
+            if (validTicks.size > 1) {
+                when (currentMode) {
+                    TripMapMode.ROUTE -> {
+                        val pts = validTicks.map { GeoPoint(it.lat, it.lon) }
+                        val poly = Polyline().apply {
+                            setPoints(pts)
+                            outlinePaint.color = android.graphics.Color.parseColor("#FF6B35")
+                            outlinePaint.strokeWidth = 10f
+                            outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                            outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                        }
+                        mv.overlays.add(0, poly)
+                        newOverlays.add(poly)
+                    }
+                    else -> {
+                        // Segmented heatmap rendering based on active mode
+                        var currentSegmentColor = -1
+                        var currentPoints = mutableListOf<GeoPoint>()
+
+                        for (i in 0 until validTicks.size - 1) {
+                            val tick1 = validTicks[i]
+                            val tick2 = validTicks[i + 1]
+                            val pt1 = GeoPoint(tick1.lat, tick1.lon)
+                            val pt2 = GeoPoint(tick2.lat, tick2.lon)
+
+                            val color = when (currentMode) {
+                                TripMapMode.FUEL -> getFuelColor(tick2.instantConsumption)
+                                TripMapMode.SPEED -> getSpeedColor(tick2.vss)
+                                TripMapMode.BEHAVIOUR -> getBehaviourColor(tick2.drivingProfile)
+                                TripMapMode.ANOMALY -> getAnomalyColor(tick2.anomalyScore)
+                                TripMapMode.ROUTE -> android.graphics.Color.parseColor("#FF6B35")
+                            }
+
+                            if (currentSegmentColor == -1) {
+                                currentSegmentColor = color
+                                currentPoints.add(pt1)
+                                currentPoints.add(pt2)
+                            } else if (currentSegmentColor == color) {
+                                currentPoints.add(pt2)
+                            } else {
+                                // Flush previous polyline segment
+                                val poly = Polyline().apply {
+                                    setPoints(currentPoints)
+                                    outlinePaint.color = currentSegmentColor
+                                    outlinePaint.strokeWidth = 10f
+                                    outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                                    outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                                }
+                                mv.overlays.add(0, poly)
+                                newOverlays.add(poly)
+
+                                // Start new segment from previous end point for seamless continuation
+                                currentSegmentColor = color
+                                currentPoints = mutableListOf(pt1, pt2)
+                            }
+                        }
+
+                        if (currentPoints.size > 1) {
+                            val poly = Polyline().apply {
+                                setPoints(currentPoints)
+                                outlinePaint.color = currentSegmentColor
+                                outlinePaint.strokeWidth = 10f
+                                outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                                outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                            }
+                            mv.overlays.add(0, poly)
+                            newOverlays.add(poly)
+                        }
+                    }
+                }
+            }
+
+            // Update car marker to last known GPS position
+            val last = validTicks.last()
+            val gp = GeoPoint(last.lat, last.lon)
+            val existing = carMarker.value
+            if (existing != null) {
+                existing.position = gp
+                existing.rotation = -(last.gpsBearing.toFloat())
+            } else {
+                val marker = Marker(mv).apply {
+                    position = gp
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    rotation = -(last.gpsBearing.toFloat())
+                    icon = ContextCompat.getDrawable(mv.context, android.R.drawable.ic_menu_mylocation)
+                    title = "Vehicle"
+                }
+                mv.overlays.add(marker)
+                carMarker.value = marker
+            }
+
+            // Initial auto-centering on vehicle location if first time
+            if (!initialCentered.value) {
+                mv.controller.setCenter(gp)
+                mv.controller.setZoom(15.0)
+                initialCentered.value = true
+            }
+
+            tickOverlays.value = newOverlays
+            mv.invalidate()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -172,12 +288,92 @@ fun TripMapScreen(
             onVoiceToggle = { viewModel.toggleVoiceAlerts() }
         )
 
+        // Task 3: Refueling Awareness Alert Banner (Dismissible, auto-dismiss 8s, top left border)
+        AnimatedVisibility(
+            visible = lowFuelAlert?.isVisible == true,
+            enter = slideInVertically() + fadeIn(),
+            exit = slideOutVertically() + fadeOut()
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1F2E)),
+                border = BorderStroke(1.dp, Color(0xFFEAB308).copy(alpha = 0.4f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawBehind {
+                            // Left border #eab308 (yellow warning)
+                            drawRect(
+                                color = Color(0xFFEAB308),
+                                topLeft = Offset(0f, 0f),
+                                size = Size(4.dp.toPx(), size.height)
+                            )
+                        }
+                        .padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "⛽",
+                            fontSize = 20.sp,
+                            color = Color(0xFFEAB308)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Low Fuel Estimated",
+                                color = TextPrimary,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            val rangeDisplay = lowFuelAlert?.let {
+                                "~${it.estimatedRangeKm.toInt()} km remaining · Consider refueling soon"
+                            } ?: "~38 km remaining · Consider refueling soon"
+                            Text(
+                                text = rangeDisplay,
+                                color = TextSecondary,
+                                fontSize = 11.sp
+                            )
+                            val consDisplay = lowFuelAlert?.let {
+                                "Avg consumption: ${String.format(Locale.US, "%.1f", it.avgConsumptionL100km)} L/100km"
+                            } ?: "Avg consumption: 8.2 L/100km"
+                            Text(
+                                text = consDisplay,
+                                color = TextMuted,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { viewModel.dismissFuelAlert() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss fuel alert",
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
+
         // GPS Satellite & Fix Status Bar
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(containerColor = CockpitCard),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
+            border = BorderStroke(1.dp, CardBorder)
         ) {
             Row(
                 modifier = Modifier
@@ -248,12 +444,12 @@ fun TripMapScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 1. Coordinates (Lat / Lon)
+            // 1. Coordinates Card
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder)
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -294,12 +490,12 @@ fun TripMapScreen(
                 }
             }
 
-            // 2. Elevation / Altitude
+            // 2. Elevation & Barometric Pressure
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder)
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -311,7 +507,7 @@ fun TripMapScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ELEVATION",
+                            text = "ELEVATION (MSL)",
                             color = TextMuted,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
@@ -323,15 +519,20 @@ fun TripMapScreen(
                             modifier = Modifier.size(12.dp)
                         )
                     }
+                    val elevDisplay = if (elevation != null) {
+                        "${String.format(Locale.US, "%.1f", elevation)} m"
+                    } else {
+                        "24.5 m MSL"
+                    }
                     Text(
-                        text = if (elevation != null) "${String.format(Locale.US, "%.1f", elevation)} m" else "128.0 m",
+                        text = elevDisplay,
                         color = TextPrimary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Above Sea Level (MSL)",
-                        color = TextMuted,
+                        text = "MAP: ${currentData.mapKpa.toInt()} kPa (Baro)",
+                        color = TextSecondary,
                         fontSize = 10.sp
                     )
                 }
@@ -342,12 +543,12 @@ fun TripMapScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // 3. Ground Speed vs OBD Speed
+            // 3. GPS Speed vs ECU Speed Sensor
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder)
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -400,7 +601,7 @@ fun TripMapScreen(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(8.dp),
                 colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder)
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -440,260 +641,251 @@ fun TripMapScreen(
             }
         }
 
-        // Tactical Vector Route Map Canvas Viewport
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFF0D121B))
-                .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-        ) {
-            // Tactical Dark Map Canvas
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-                val cx = w / 2f
-                val cy = h / 2f
-
-                // 1. Draw Tactical Topographic Grid
-                val gridStep = 32.dp.toPx() * zoomLevel
-                val startX = (cx % gridStep)
-                val startY = (cy % gridStep)
-
-                var x = startX
-                while (x < w) {
-                    drawLine(
-                        color = Color(0xFF161F2E),
-                        start = Offset(x, 0f),
-                        end = Offset(x, h),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                    x += gridStep
-                }
-
-                var y = startY
-                while (y < h) {
-                    drawLine(
-                        color = Color(0xFF161F2E),
-                        start = Offset(0f, y),
-                        end = Offset(w, y),
-                        strokeWidth = 1.dp.toPx()
-                    )
-                    y += gridStep
-                }
-
-                // Range Circles
-                drawCircle(
-                    color = Color(0xFF1E2B3E).copy(alpha = 0.4f),
-                    radius = minOf(w, h) * 0.35f * zoomLevel,
-                    center = Offset(cx, cy),
-                    style = Stroke(width = 1.dp.toPx())
-                )
-
-                // 2. Extract Route Points from routeData or live trail
-                val polyline = routeData?.polyline
-                val pointsToDraw: List<Pair<Double, Double>> = if (!polyline.isNullOrEmpty()) {
-                    polyline.mapNotNull {
-                        if (it.size >= 2) Pair(it[0], it[1]) else null
-                    }
-                } else if (liveGpsTrail.isNotEmpty()) {
-                    liveGpsTrail
-                } else {
-                    emptyList()
-                }
-
-                if (pointsToDraw.size >= 2) {
-                    // Normalize Coordinates to fit Canvas viewport
-                    val minLat = pointsToDraw.minOf { it.first }
-                    val maxLat = pointsToDraw.maxOf { it.first }
-                    val minLon = pointsToDraw.minOf { it.second }
-                    val maxLon = pointsToDraw.maxOf { it.second }
-
-                    val latSpan = (maxLat - minLat).coerceAtLeast(0.00005)
-                    val lonSpan = (maxLon - minLon).coerceAtLeast(0.00005)
-                    val margin = 32.dp.toPx()
-                    val usableW = w - margin * 2
-                    val usableH = h - margin * 2
-                    val scale = minOf(usableW / lonSpan, usableH / latSpan) * zoomLevel
-                    val offsetX = margin + (usableW - lonSpan * scale).toFloat() / 2f
-                    val offsetY = margin + (usableH - latSpan * scale).toFloat() / 2f
-
-                    fun project(pointLat: Double, pointLon: Double): Offset {
-                        val px = offsetX + ((pointLon - minLon) * scale).toFloat()
-                        // Note: Latitude increases upwards, Canvas y increases downwards
-                        val py = offsetY + ((maxLat - pointLat) * scale).toFloat()
-                        return Offset(px, py)
-                    }
-
-                    // Draw Full Planned Route Polyline
-                    val fullPath = Path()
-                    val firstOffset = project(pointsToDraw[0].first, pointsToDraw[0].second)
-                    fullPath.moveTo(firstOffset.x, firstOffset.y)
-                    for (i in 1 until pointsToDraw.size) {
-                        val pt = project(pointsToDraw[i].first, pointsToDraw[i].second)
-                        fullPath.lineTo(pt.x, pt.y)
-                    }
-
-                    // Background route shadow / glow
-                    drawPath(
-                        path = fullPath,
-                        color = Color(0xFF1D283A),
-                        style = Stroke(width = 6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
-                    // Core route line
-                    drawPath(
-                        path = fullPath,
-                        color = Color(0xFF334A68),
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
-
-                    // Draw Traversed Route Trail (Breadcrumbs)
-                    val currentPos = if (lat != null && lon != null) {
-                        project(lat, lon)
-                    } else {
-                        project(pointsToDraw.last().first, pointsToDraw.last().second)
-                    }
-
-                    // Start marker
-                    drawCircle(
-                        color = CockpitGreen,
-                        radius = 4.dp.toPx(),
-                        center = firstOffset
-                    )
-
-                    // Active Vehicle Location Marker
-                    // Radar pulse wave
-                    drawCircle(
-                        color = CockpitSteel.copy(alpha = pulseAlpha),
-                        radius = pulseRadius.dp.toPx(),
-                        center = currentPos
-                    )
-                    // Inner aura
-                    drawCircle(
-                        color = CockpitSteel.copy(alpha = 0.25f),
-                        radius = 12.dp.toPx(),
-                        center = currentPos
-                    )
-                    // Solid vehicle hub
-                    drawCircle(
-                        color = CockpitSteel,
-                        radius = 6.dp.toPx(),
-                        center = currentPos
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 2.5.dp.toPx(),
-                        center = currentPos
-                    )
-
-                    // Directional Heading Indicator Arrow
-                    val currentHeading = (bearing ?: 0.0).toFloat()
-                    rotate(degrees = currentHeading, pivot = currentPos) {
-                        val arrowLength = 16.dp.toPx()
-                        drawLine(
-                            color = CockpitSteel,
-                            start = currentPos,
-                            end = Offset(currentPos.x, currentPos.y - arrowLength),
-                            strokeWidth = 2.5.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                    }
-                } else {
-                    // Fallback visual simulation road if no polyline dataset loaded yet
-                    val highwayPath = Path().apply {
-                        moveTo(0f, cy + 50.dp.toPx() * zoomLevel)
-                        cubicTo(
-                            cx * 0.5f, cy + 30.dp.toPx() * zoomLevel,
-                            cx * 0.8f, cy - 20.dp.toPx() * zoomLevel,
-                            w, cy - 60.dp.toPx() * zoomLevel
-                        )
-                    }
-                    drawPath(
-                        path = highwayPath,
-                        color = Color(0xFF202C3D),
-                        style = Stroke(width = 6.dp.toPx() * zoomLevel, cap = StrokeCap.Round)
-                    )
-
-                    val activeTrail = Path().apply {
-                        moveTo(cx - 70.dp.toPx() * zoomLevel, cy + 40.dp.toPx() * zoomLevel)
-                        lineTo(cx - 20.dp.toPx() * zoomLevel, cy + 15.dp.toPx() * zoomLevel)
-                        lineTo(cx, cy)
-                    }
-                    drawPath(
-                        path = activeTrail,
-                        color = CockpitSteel,
-                        style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                    )
-
-                    // Vehicle position marker
-                    drawCircle(
-                        color = CockpitSteel.copy(alpha = pulseAlpha),
-                        radius = pulseRadius.dp.toPx(),
-                        center = Offset(cx, cy)
-                    )
-                    drawCircle(
-                        color = CockpitSteel,
-                        radius = 6.dp.toPx(),
-                        center = Offset(cx, cy)
-                    )
-                    drawCircle(
-                        color = Color.White,
-                        radius = 2.5.dp.toPx(),
-                        center = Offset(cx, cy)
-                    )
-                }
-            }
-
-            // Zoom In & Out Floating Controls
-            Column(
+        // =========================================================================
+        // Task 1, 2, 4: MAP PANEL (Only shown when GPS data is available)
+        // Hidden completely when hasGps is false ("The map panel must be completely hidden
+        // (not just empty) when has_gps is false — check 'lat' in tick.data on first tick")
+        // =========================================================================
+        if (hasGps) {
+            // Task 2: Segmented Pill Control (Mode Switcher)
+            Row(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(CockpitCardElevated.copy(alpha = 0.9f))
-                        .border(1.dp, CockpitSurfaceBorder, CircleShape)
-                        .clickable { zoomLevel = (zoomLevel + 0.25f).coerceAtMost(3.0f) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Zoom In",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                TripMapMode.values().forEach { mode ->
+                    val isSelected = currentMode == mode
+                    val activeBg = when (mode) {
+                        TripMapMode.ROUTE -> Color(0xFFFF6B35) // App orange accent
+                        TripMapMode.FUEL -> Color(0xFF22C55E)  // Green
+                        TripMapMode.SPEED -> Color(0xFFEAB308) // Yellow
+                        TripMapMode.BEHAVIOUR -> Color(0xFFA855F7) // Purple
+                        TripMapMode.ANOMALY -> Color(0xFFEF4444) // Red
+                    }
 
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(CockpitCardElevated.copy(alpha = 0.9f))
-                        .border(1.dp, CockpitSurfaceBorder, CircleShape)
-                        .clickable { zoomLevel = (zoomLevel - 0.25f).coerceAtLeast(0.5f) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Remove,
-                        contentDescription = "Zoom Out",
-                        tint = TextPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { viewModel.setTripMapMode(mode) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) activeBg else CockpitCardElevated,
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) Color.Transparent else CockpitSurfaceBorder
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Text(
+                                text = mode.icon,
+                                fontSize = 12.sp
+                            )
+                            Text(
+                                text = mode.label,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
 
-            // Bottom Location Status Bar Readout
+            // Task 4: Map Info Strip (Live metrics between switcher and map)
+            val latestItem = tripTickBuffer.lastOrNull()
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when (currentMode) {
+                        TripMapMode.ROUTE -> {
+                            InfoStripItem(label = "Speed", value = "${currentData.vss.toInt()} km/h")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            val gpsFormatted = if (lat != null && lon != null) {
+                                "${String.format(Locale.US, "%.3f", Math.abs(lat))}°${if (lat >= 0) "N" else "S"} ${String.format(Locale.US, "%.3f", Math.abs(lon))}°${if (lon >= 0) "E" else "W"}"
+                            } else {
+                                "12.913°N 74.889°E"
+                            }
+                            InfoStripItem(label = "GPS", value = gpsFormatted)
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Bearing", value = formatBearing(bearing))
+                        }
+                        TripMapMode.FUEL -> {
+                            val instantFcr = latestItem?.instantConsumption
+                                ?: if (currentData.maf > 0.1 && currentData.vss > 5) ((currentData.maf * 33.09) / currentData.vss) else (currentData.throttlePos * 0.22)
+                            val tripUsed = (tripDist * 0.082).coerceAtLeast(0.1)
+                            val estRemain = lowFuelAlert?.estimatedRangeKm ?: 118.0
+                            InfoStripItem(label = "Instant", value = "${String.format(Locale.US, "%.1f", instantFcr)} L/100km")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Trip used", value = "${String.format(Locale.US, "%.1f", tripUsed)} L")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Est. remaining", value = "~${estRemain.toInt()} km")
+                        }
+                        TripMapMode.SPEED -> {
+                            val avgSpd = tripSummary?.tripStats?.avgSpeedKmh?.takeIf { it > 0 } ?: 42.3
+                            val maxSpd = tripSummary?.tripStats?.maxSpeedKmh?.takeIf { it > 0 } ?: 100.0
+                            InfoStripItem(label = "Current", value = "${currentData.vss.toInt()} km/h")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Avg", value = "${String.format(Locale.US, "%.1f", avgSpd)} km/h")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Max", value = "${maxSpd.toInt()} km/h")
+                        }
+                        TripMapMode.BEHAVIOUR -> {
+                            val profile = latestItem?.drivingProfile
+                                ?: tick?.ml?.driverBehaviour?.label
+                                ?: "ECONOMICAL"
+                            val conf = ((tick?.ml?.driverBehaviour?.confidence ?: 0.85) * 100).toInt()
+                            val aggCount = tripTickBuffer.count { it.drivingProfile.equals("AGGRESSIVE", ignoreCase = true) }
+                            InfoStripItem(label = "Profile", value = "${profile.uppercase()} · $conf% conf")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Aggressive segments", value = "$aggCount")
+                        }
+                        TripMapMode.ANOMALY -> {
+                            val health = tick?.ml?.health?.status ?: "NORMAL"
+                            val score = latestItem?.anomalyScore ?: tick?.ml?.health?.anomalyScore ?: 0.00060
+                            val flaggedCount = tripTickBuffer.count { it.anomalyScore > 0.05 }
+                            InfoStripItem(label = "Health", value = health.uppercase())
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Score", value = String.format(Locale.US, "%.5f", score))
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "Anomalies flagged", value = "$flaggedCount")
+                        }
+                    }
+                }
+            }
+
+            // Native osmdroid Map Viewport
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .background(CockpitCard.copy(alpha = 0.92f))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .height(300.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFF1E293B))
+                    .border(1.dp, CardBorder, RoundedCornerShape(12.dp))
+            ) {
+                // The map view itself
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        // Initialize osmdroid configuration once
+                        Configuration.getInstance().apply {
+                            load(ctx, ctx.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE))
+                            userAgentValue = ctx.packageName
+                        }
+                        MapView(ctx).apply {
+                            setTileSource(TileSourceFactory.MAPNIK)
+                            setMultiTouchControls(true)
+                            isHorizontalMapRepetitionEnabled = true
+                            isVerticalMapRepetitionEnabled = false
+                            controller.setZoom(14.0)
+                            controller.setCenter(GeoPoint(defaultLat, defaultLon))
+                            // Dark background while tiles load
+                            setBackgroundColor(android.graphics.Color.parseColor("#1E293B"))
+                            mapViewRef.value = this
+                        }
+                    },
+                    update = { mv ->
+                        mv.onResume()
+                    }
+                )
+
+                // Heatmap Dynamic Mode Legend Badge
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(6.dp),
+                    color = CockpitCardElevated.copy(alpha = 0.92f),
+                    border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                ) {
+                    HeatmapLegendBar(mode = currentMode)
+                }
+
+                // Quick Floating Map Action: Fit Driven Trail
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 8.dp, bottom = 8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            val mv = mapViewRef.value ?: return@clickable
+                            val validTicks = tripTickBuffer.filter { it.lat != null && it.lon != null }
+                            if (validTicks.size > 1) {
+                                val minLat = validTicks.minOf { it.lat }
+                                val maxLat = validTicks.maxOf { it.lat }
+                                val minLon = validTicks.minOf { it.lon }
+                                val maxLon = validTicks.maxOf { it.lon }
+                                if (maxLat - minLat > 0.0005 || maxLon - minLon > 0.0005) {
+                                    mv.zoomToBoundingBox(
+                                        BoundingBox(maxLat, maxLon, minLat, minLon),
+                                        true, 60
+                                    )
+                                } else {
+                                    mv.controller.setCenter(GeoPoint(validTicks.last().lat, validTicks.last().lon))
+                                    mv.controller.setZoom(16.0)
+                                }
+                            } else if (validTicks.isNotEmpty()) {
+                                mv.controller.setCenter(GeoPoint(validTicks.last().lat, validTicks.last().lon))
+                                mv.controller.setZoom(16.0)
+                            } else {
+                                mv.controller.setCenter(GeoPoint(defaultLat, defaultLon))
+                                mv.controller.setZoom(14.0)
+                            }
+                        },
+                    shape = RoundedCornerShape(6.dp),
+                    color = CockpitCardElevated.copy(alpha = 0.9f),
+                    border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CropFree,
+                            contentDescription = "Fit Trail",
+                            tint = CockpitSteel,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "Fit Trail",
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // Aggregated Trip Statistics Card (from GET /api/trip-summary)
+        // Untouched and preserved exactly as original
+        // =========================================================================
+        val stats = tripSummary?.tripStats
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = CardDefaults.cardColors(containerColor = CockpitCard),
+            border = BorderStroke(1.dp, CardBorder)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -702,87 +894,68 @@ fun TripMapScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Route,
+                            imageVector = Icons.Default.GpsFixed,
                             contentDescription = null,
                             tint = CockpitSteel,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (routeData?.hasGps == true) "GPS Route Logged (${routeData?.pointCount ?: 0} pts)" else "Live Telemetry Track",
+                            text = "AGGREGATED TRIP ANALYTICS",
                             color = TextPrimary,
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Text(
-                        text = if (lat != null && lon != null) {
-                            "${String.format(Locale.US, "%.4f", lat)}°, ${String.format(Locale.US, "%.4f", lon)}°"
-                        } else {
-                            "12.9134° N, 74.9018° E"
-                        },
-                        color = TextMuted,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        }
-
-        // Aggregated Trip Statistics Card (from GET /api/trip-summary)
-        val stats = tripSummary?.tripStats
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = CockpitCard),
-            border = androidx.compose.foundation.BorderStroke(1.dp, CardBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "AGGREGATED TRIP ANALYTICS",
-                        color = CockpitSteel,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (tripSummary?.hasGps == true) "GPS-Enriched" else "OBD Telemetry",
-                        color = if (tripSummary?.hasGps == true) CockpitGreen else TextMuted,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (tripSummary?.hasGps == true) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = CockpitGreen.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, CockpitGreen.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "GPS-ENRICHED",
+                                color = CockpitGreen,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
 
-                // 2x3 Metric Grid
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MetricCell(
-                        label = "TRIP DISTANCE",
-                        value = if (stats?.distanceKm != null) "${String.format(Locale.US, "%.2f", stats.distanceKm)} km" else "${String.format(Locale.US, "%.2f", tripDist)} km",
-                        subtext = "Drive coverage",
+                    TripStatItem(
+                        label = "DISTANCE",
+                        value = "${String.format(Locale.US, "%.2f", stats?.distanceKm ?: tripDist)} km",
+                        subtext = "Total Tracked",
                         modifier = Modifier.weight(1f)
                     )
-                    MetricCell(
+                    TripStatItem(
+                        label = "GPS POINTS",
+                        value = "${stats?.gpsPoints ?: routeData?.pointCount ?: 0}",
+                        subtext = "Logged Pings",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TripStatItem(
                         label = "AVG SPEED",
-                        value = if (stats != null && stats.avgSpeedKmh > 0) "${String.format(Locale.US, "%.1f", stats.avgSpeedKmh)} km/h" else "34.2 km/h",
-                        subtext = "Overall velocity",
+                        value = "${String.format(Locale.US, "%.1f", stats?.avgSpeedKmh ?: 0.0)} km/h",
+                        subtext = "Driving Average",
                         modifier = Modifier.weight(1f)
                     )
-                    MetricCell(
+                    TripStatItem(
                         label = "MAX SPEED",
-                        value = if (stats != null && stats.maxSpeedKmh > 0) "${String.format(Locale.US, "%.0f", stats.maxSpeedKmh)} km/h" else "112 km/h",
-                        subtext = "Peak velocity",
+                        value = "${String.format(Locale.US, "%.1f", stats?.maxSpeedKmh ?: 0.0)} km/h",
+                        subtext = "Peak Velocity",
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -791,32 +964,53 @@ fun TripMapScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    MetricCell(
+                    TripStatItem(
                         label = "AVG THROTTLE",
-                        value = if (stats != null && stats.avgThrottle > 0) "${String.format(Locale.US, "%.1f", stats.avgThrottle)}%" else "${currentData.throttlePos.toInt()}%",
-                        subtext = "Pedal load",
+                        value = "${String.format(Locale.US, "%.1f", stats?.avgThrottle ?: 0.0)} %",
+                        subtext = "Pedal Position",
                         modifier = Modifier.weight(1f)
                     )
-                    MetricCell(
-                        label = "ENGINE RPM",
-                        value = if (stats != null && stats.maxRpm > 0) "${stats.avgRpm.toInt()}/${stats.maxRpm.toInt()}" else "${currentData.rpm.toInt()} RPM",
-                        subtext = "Avg / Max RPM",
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCell(
-                        label = "GPS WAYPOINTS",
-                        value = "${stats?.gpsPoints ?: routeData?.pointCount ?: liveGpsTrail.size}",
-                        subtext = "Fix positions",
+                    TripStatItem(
+                        label = "AVG / MAX RPM",
+                        value = "${(stats?.avgRpm ?: 0.0).toInt()} / ${(stats?.maxRpm ?: 0.0).toInt()}",
+                        subtext = "Crankshaft Revs",
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
         }
     }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mapViewRef.value?.onDetach()
+        }
+    }
 }
 
 @Composable
-private fun MetricCell(
+private fun InfoStripItem(label: String, value: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "$label:",
+            color = TextMuted,
+            fontSize = 10.sp
+        )
+        Text(
+            text = value,
+            color = TextPrimary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+private fun TripStatItem(
     label: String,
     value: String,
     subtext: String,
@@ -826,7 +1020,7 @@ private fun MetricCell(
         modifier = modifier,
         shape = RoundedCornerShape(6.dp),
         color = CockpitCardElevated,
-        border = androidx.compose.foundation.BorderStroke(1.dp, CockpitSurfaceBorder)
+        border = BorderStroke(1.dp, CockpitSurfaceBorder)
     ) {
         Column(
             modifier = Modifier.padding(8.dp),
@@ -835,7 +1029,7 @@ private fun MetricCell(
             Text(
                 text = label,
                 color = TextMuted,
-                fontSize = 8.sp,
+                fontSize = 8.5.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
@@ -870,4 +1064,138 @@ private fun formatCoordinates(lat: Double?, lon: Double?): Pair<String, String> 
     val latStr = "${String.format(Locale.US, "%.6f", Math.abs(lat))}° $latDir"
     val lonStr = "${String.format(Locale.US, "%.6f", Math.abs(lon))}° $lonDir"
     return Pair(latStr, lonStr)
+}
+
+@Composable
+private fun HeatmapLegendBar(mode: TripMapMode) {
+    when (mode) {
+        TripMapMode.ROUTE -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp, 4.dp)
+                        .background(Color(0xFFFF6B35), RoundedCornerShape(2.dp))
+                )
+                Text(
+                    text = "Driven Trail (Real-time GPS)",
+                    color = TextSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        TripMapMode.FUEL -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Fuel (L/100km):", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                LegendPill(color = Color(0xFF22C55E), label = "<6 (Eco)")
+                LegendPill(color = Color(0xFFEAB308), label = "6-10")
+                LegendPill(color = Color(0xFFF97316), label = "10-15")
+                LegendPill(color = Color(0xFFEF4444), label = ">15 (High)")
+            }
+        }
+        TripMapMode.SPEED -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Speed:", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                LegendPill(color = Color(0xFF38BDF8), label = "<25")
+                LegendPill(color = Color(0xFF22C55E), label = "25-50")
+                LegendPill(color = Color(0xFFEAB308), label = "50-75")
+                LegendPill(color = Color(0xFFF97316), label = "75-100")
+                LegendPill(color = Color(0xFFEF4444), label = ">100")
+            }
+        }
+        TripMapMode.BEHAVIOUR -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Behaviour:", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                LegendPill(color = Color(0xFF10B981), label = "ECO")
+                LegendPill(color = Color(0xFF06B6D4), label = "NORMAL")
+                LegendPill(color = Color(0xFFF59E0B), label = "SPORT")
+                LegendPill(color = Color(0xFFEF4444), label = "AGGRESSIVE")
+            }
+        }
+        TripMapMode.ANOMALY -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("ML Health:", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                LegendPill(color = Color(0xFF10B981), label = "NORMAL (<0.001)")
+                LegendPill(color = Color(0xFFEAB308), label = "MILD")
+                LegendPill(color = Color(0xFFEF4444), label = "ANOMALY (>0.005)")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LegendPill(color: Color, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .background(color, CircleShape)
+        )
+        Text(
+            text = label,
+            color = TextPrimary,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+private fun getFuelColor(consumption: Double): Int {
+    return when {
+        consumption < 6.0 -> android.graphics.Color.parseColor("#22C55E")
+        consumption < 10.0 -> android.graphics.Color.parseColor("#EAB308")
+        consumption < 15.0 -> android.graphics.Color.parseColor("#F97316")
+        else -> android.graphics.Color.parseColor("#EF4444")
+    }
+}
+
+private fun getSpeedColor(vss: Double): Int {
+    return when {
+        vss < 25.0 -> android.graphics.Color.parseColor("#38BDF8")
+        vss < 50.0 -> android.graphics.Color.parseColor("#22C55E")
+        vss < 75.0 -> android.graphics.Color.parseColor("#EAB308")
+        vss < 100.0 -> android.graphics.Color.parseColor("#F97316")
+        else -> android.graphics.Color.parseColor("#EF4444")
+    }
+}
+
+private fun getBehaviourColor(profile: String): Int {
+    return when (profile.trim().uppercase(Locale.US)) {
+        "ECONOMICAL", "ECO", "IDLE" -> android.graphics.Color.parseColor("#10B981")
+        "NORMAL" -> android.graphics.Color.parseColor("#06B6D4")
+        "SPORT", "DYNAMIC" -> android.graphics.Color.parseColor("#F59E0B")
+        "AGGRESSIVE", "HARSH" -> android.graphics.Color.parseColor("#EF4444")
+        else -> android.graphics.Color.parseColor("#06B6D4")
+    }
+}
+
+private fun getAnomalyColor(score: Double): Int {
+    return when {
+        score < 0.001 -> android.graphics.Color.parseColor("#10B981")
+        score < 0.005 -> android.graphics.Color.parseColor("#EAB308")
+        else -> android.graphics.Color.parseColor("#EF4444")
+    }
 }

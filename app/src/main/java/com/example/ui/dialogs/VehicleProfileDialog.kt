@@ -52,8 +52,9 @@ import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitCard
 import com.example.ui.theme.CockpitCardElevated
 import com.example.ui.theme.CockpitGreen
-import com.example.ui.theme.CockpitSteel
 import com.example.ui.theme.CockpitSurfaceBorder
+import com.example.ui.theme.LamboCarbonBlack
+import com.example.ui.theme.LamboYellow
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -123,7 +124,7 @@ fun VehicleProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = CockpitSteel,
+                        focusedBorderColor = LamboYellow,
                         unfocusedBorderColor = CockpitSurfaceBorder
                     )
                 )
@@ -137,7 +138,7 @@ fun VehicleProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = CockpitSteel,
+                        focusedBorderColor = LamboYellow,
                         unfocusedBorderColor = CockpitSurfaceBorder
                     )
                 )
@@ -156,7 +157,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -169,7 +170,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -189,7 +190,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -202,7 +203,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -222,7 +223,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -235,7 +236,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -255,7 +256,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -268,7 +269,7 @@ fun VehicleProfileDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = CockpitSteel,
+                            focusedBorderColor = LamboYellow,
                             unfocusedBorderColor = CockpitSurfaceBorder
                         )
                     )
@@ -283,7 +284,7 @@ fun VehicleProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedBorderColor = CockpitSteel,
+                        focusedBorderColor = LamboYellow,
                         unfocusedBorderColor = CockpitSurfaceBorder
                     )
                 )
@@ -296,7 +297,10 @@ fun VehicleProfileDialog(
                     Checkbox(
                         checked = isActive,
                         onCheckedChange = { isActive = it },
-                        colors = CheckboxDefaults.colors(checkedColor = CockpitSteel)
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = LamboYellow,
+                            checkmarkColor = LamboCarbonBlack
+                        )
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
@@ -331,19 +335,19 @@ fun VehicleProfileDialog(
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = CockpitSteel),
+                    colors = ButtonDefaults.buttonColors(containerColor = LamboYellow),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Save,
                         contentDescription = "Save",
-                        tint = TextPrimary,
+                        tint = LamboCarbonBlack,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "SAVE PROFILE",
-                        color = TextPrimary,
+                        color = LamboCarbonBlack,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )

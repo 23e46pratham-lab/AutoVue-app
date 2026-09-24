@@ -60,3 +60,34 @@ data class DtcResponse(
 data class DtcRequest(
     @Json(name = "codes") val codes: List<String>
 )
+
+enum class TripMapMode(val id: String, val label: String, val icon: String) {
+    ROUTE("route", "Route", "🔵"),
+    FUEL("fuel", "Fuel", "🌡"),
+    SPEED("speed", "Speed", "🚗"),
+    BEHAVIOUR("behaviour", "Behaviour", "🧠"),
+    ANOMALY("anomaly", "Anomaly", "⚠")
+}
+
+data class TripTickItem(
+    val lat: Double,
+    val lon: Double,
+    val vss: Double,
+    val rpm: Double,
+    val throttlePos: Double,
+    val maf: Double,
+    val instantConsumption: Double,
+    val drivingProfile: String,
+    val anomalyScore: Double,
+    val gpsBearing: Double,
+    val elevationM: Double? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+data class LowFuelAlertState(
+    val remainingFuelLiters: Double,
+    val estimatedRangeKm: Double,
+    val avgConsumptionL100km: Double,
+    val isVisible: Boolean = true
+)
+

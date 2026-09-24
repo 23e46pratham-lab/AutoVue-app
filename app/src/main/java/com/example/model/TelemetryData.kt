@@ -18,7 +18,11 @@ data class TelemetryTick(
     @Json(name = "dataset_data") val datasetData: TelemetryData? = null,
     @Json(name = "overrides") val overrides: List<String>? = null,
     @Json(name = "ml") val ml: MlInferencePayload? = null,
-    @Json(name = "dtcs") val dtcs: List<String>? = null
+    @Json(name = "dtcs") val dtcs: List<String>? = null,
+    @Json(name = "anomaly_score") val anomalyScore: Double? = null,
+    @Json(name = "health_status") val healthStatus: String? = null,
+    @Json(name = "driving_profile") val drivingProfile: String? = null,
+    @Json(name = "confidence") val confidence: Double? = null
 )
 
 @JsonClass(generateAdapter = true)
@@ -45,7 +49,11 @@ data class TelemetryData(
     @Json(name = "elevation_m") val elevationM: Double? = null,
     @Json(name = "gps_bearing") val gpsBearing: Double? = null,
     @Json(name = "gps_speed_ms") val gpsSpeedMs: Double? = null,
-    @Json(name = "gps_fix") val gpsFix: Int? = null
+    @Json(name = "gps_fix") val gpsFix: Int? = null,
+    @Json(name = "anomaly_score") val anomalyScore: Double? = null,
+    @Json(name = "health_status") val healthStatus: String? = null,
+    @Json(name = "driving_profile") val drivingProfile: String? = null,
+    @Json(name = "confidence") val confidence: Double? = null
 ) {
     val hasGps: Boolean
         get() = lat != null && lon != null

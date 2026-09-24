@@ -559,7 +559,9 @@ fun CockpitInstrumentCluster(
                         text = "peak: ${peakPowerHp.toInt()} cv at $peakPowerRpm rpm",
                         color = TextMuted,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
                 Spacer(modifier = Modifier.height(3.dp))
@@ -606,7 +608,9 @@ fun CockpitInstrumentCluster(
                         text = "peak: ${peakTorqueNm.toInt()} nm at $peakTorqueRpm rpm",
                         color = TextMuted,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
                 Spacer(modifier = Modifier.height(3.dp))

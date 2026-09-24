@@ -188,6 +188,68 @@ class SharedTelemetryViewModel(
     private val _liveGpsTrail = MutableStateFlow<List<Pair<Double, Double>>>(emptyList())
     val liveGpsTrail = _liveGpsTrail.asStateFlow()
 
+    // Trip Map Enhancement States (Leaflet Map, Modes, Fuel Alert)
+    private val _tripTickBuffer = MutableStateFlow<List<com.example.model.TripTickItem>>(emptyList())
+    val tripTickBuffer = _tripTickBuffer.asStateFlow()
+
+    private val _currentMapMode = MutableStateFlow(com.example.model.TripMapMode.ROUTE)
+    val currentMapMode = _currentMapMode.asStateFlow()
+
+    private val _lowFuelAlert = MutableStateFlow<com.example.model.LowFuelAlertState?>(null)
+    val lowFuelAlert = _lowFuelAlert.asStateFlow()
+
+    private var fuelAlertShown = false
+    private var cumulativeTripFuelUsedLitres = 0.0
+    private var lastRecordedGpsPoint: Pair<Double, Double>? = null
+    private var fuelAlertDismissJob: Job? = null
+
+    fun setTripMapMode(mode: com.example.model.TripMapMode) {
+        _currentMapMode.value = mode
+    }
+
+    fun dismissFuelAlert() {
+        _lowFuelAlert.value = _lowFuelAlert.value?.copy(isVisible = false)
+    }
+
+    fun triggerTestFuelAlert() {
+        val remaining = 3.8
+        val avgFcr = 8.2
+        val rangeKm = (remaining / avgFcr) * 100.0
+        showFuelAlert(remaining, rangeKm, avgFcr)
+    }
+
+    private fun showFuelAlert(remainingLiters: Double, rangeKm: Double, avgFcr: Double) {
+        _lowFuelAlert.value = com.example.model.LowFuelAlertState(
+            remainingFuelLiters = remainingLiters,
+            estimatedRangeKm = rangeKm,
+            avgConsumptionL100km = avgFcr,
+            isVisible = true
+        )
+        fuelAlertDismissJob?.cancel()
+        fuelAlertDismissJob = viewModelScope.launch {
+            delay(8000)
+            _lowFuelAlert.value = _lowFuelAlert.value?.copy(isVisible = false)
+        }
+    }
+
+    fun resetTripSession() {
+        _tripTickBuffer.value = emptyList()
+        _lowFuelAlert.value = null
+        fuelAlertShown = false
+        cumulativeTripFuelUsedLitres = 0.0
+        lastRecordedGpsPoint = null
+    }
+
+    private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return 6371.0 * c
+    }
+
     fun updateVehicleProfile(profile: VehicleProfile) {
         _vehicleProfile.value = profile
     }
@@ -385,7 +447,7 @@ class SharedTelemetryViewModel(
                         _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
                     }
 
-                    // Process Live GPS coordinates
+                    // Process Live GPS coordinates & Trip Tick Buffer
                     if (tick.data.hasGps) {
                         val lat = tick.data.lat
                         val lon = tick.data.lon
@@ -396,6 +458,86 @@ class SharedTelemetryViewModel(
                                 currentGpsList.add(Pair(lat, lon))
                                 if (currentGpsList.size > 2000) currentGpsList.removeAt(0)
                                 _liveGpsTrail.value = currentGpsList
+                            }
+
+                            // Calculate segment distance for trip fuel calculation
+                            val prevPt = lastRecordedGpsPoint
+                            val segmentDistKm = if (prevPt != null) {
+                                haversineKm(prevPt.first, prevPt.second, lat, lon)
+                            } else {
+                                0.0
+                            }
+                            lastRecordedGpsPoint = Pair(lat, lon)
+
+                            // Instant fuel consumption (L/100km)
+                            val instantFcr = if (tick.data.maf > 0.1 && tick.data.vss > 5.0) {
+                                ((tick.data.maf * 33.09) / tick.data.vss).coerceIn(1.0, 40.0)
+                            } else if (tick.data.vss > 5.0 && tick.data.throttlePos > 0.0) {
+                                (tick.data.throttlePos * 0.22).coerceIn(2.0, 30.0)
+                            } else if (tick.data.throttlePos > 0.0) {
+                                (tick.data.throttlePos * 0.15).coerceIn(0.0, 15.0)
+                            } else {
+                                0.0
+                            }
+
+                            if (segmentDistKm > 0.0) {
+                                cumulativeTripFuelUsedLitres += (instantFcr / 100.0) * segmentDistKm
+                            }
+
+                            val drivingProfile = tick.drivingProfile 
+                                ?: tick.data.drivingProfile 
+                                ?: tick.ml?.driverBehaviour?.label 
+                                ?: "NORMAL"
+
+                            val anomalyScore = tick.anomalyScore 
+                                ?: tick.data.anomalyScore 
+                                ?: tick.ml?.health?.anomalyScore 
+                                ?: 0.0
+
+                            val tripItem = com.example.model.TripTickItem(
+                                lat = lat,
+                                lon = lon,
+                                vss = tick.data.vss,
+                                rpm = tick.data.rpm,
+                                throttlePos = tick.data.throttlePos,
+                                maf = tick.data.maf,
+                                instantConsumption = instantFcr,
+                                drivingProfile = drivingProfile,
+                                anomalyScore = anomalyScore,
+                                gpsBearing = tick.data.gpsBearing ?: 0.0,
+                                elevationM = tick.data.elevationM
+                            )
+
+                            val currentTripBuffer = _tripTickBuffer.value.toMutableList()
+                            currentTripBuffer.add(tripItem)
+                            if (currentTripBuffer.size > 2500) {
+                                currentTripBuffer.removeAt(0)
+                            }
+                            _tripTickBuffer.value = currentTripBuffer
+
+                            // Task 3: Refueling Station Awareness alert check
+                            if (!fuelAlertShown && _vehicleProfile.value.tankCapacityLiters > 0) {
+                                val lastRefuel = _refuelingEntries.value.firstOrNull()
+                                val tankLitres = _vehicleProfile.value.tankCapacityLiters
+                                val fuelAtStart = if (lastRefuel != null) {
+                                    (lastRefuel.afterRefuelingPercent / 100.0) * tankLitres
+                                } else {
+                                    (_vehicleProfile.value.fuelLeftPercent / 100.0) * tankLitres
+                                }
+                                val remainingLiters = (fuelAtStart - cumulativeTripFuelUsedLitres).coerceAtLeast(0.0)
+                                val avgFcr = if (_tripDistanceKm.value > 0.1 && cumulativeTripFuelUsedLitres > 0.01) {
+                                    (cumulativeTripFuelUsedLitres / _tripDistanceKm.value) * 100.0
+                                } else if (instantFcr > 0.0) {
+                                    instantFcr
+                                } else {
+                                    _vehicleProfile.value.consumptionL100km
+                                }
+                                val rangeKm = if (avgFcr > 0.0) (remainingLiters / avgFcr) * 100.0 else null
+
+                                if (rangeKm != null && rangeKm < 50.0) {
+                                    showFuelAlert(remainingLiters, rangeKm, avgFcr)
+                                    fuelAlertShown = true
+                                }
                             }
                         }
                     }
@@ -858,8 +1000,10 @@ class SharedTelemetryViewModel(
 
     fun changeDataset(datasetId: String) {
         viewModelScope.launch {
+            resetTripSession()
             repository.changeDataset(datasetId)
             fetchSimulatorStatus()
+            fetchGpsRouteAndSummary()
         }
     }
 
