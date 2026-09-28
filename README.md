@@ -6,7 +6,7 @@
 [![Protocol](https://img.shields.io/badge/Protocol-OBD--II%20%2F%20ISO%2015765--4%20CAN-FFD600?logo=car&logoColor=black)](https://en.wikipedia.org/wiki/On-board_diagnostics)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20Architecture%20%2F%20MVVM-FF6F00)](#-system-architecture)
 [![ML Engine](https://img.shields.io/badge/Analytics-XGBoost%20%26%20Autoencoder%20Inference-00C853)](#-machine-learning--predictive-analytics-pipeline)
-[![Theme](https://img.shields.io/badge/Styling-Lamborghini%20Urus%20Yellow%20%7C%20Carbon%20Fiber-D50000)](#-visual-design-system--styling)
+[![Theme](https://img.shields.io/badge/Styling-Luxury%20Cockpit%20Ivory%20%7C%20Material%203-5A4838)](#-visual-design-system--styling)
 
 ---
 
@@ -323,10 +323,10 @@ AutoVue interfaces with high-performance telemetry and machine learning backend 
 
 ## 🎨 Visual Design System & Styling
 
-AutoVue features an unapologetic, high-contrast supercar cockpit design language:
-- **Primary Accent**: **Lamborghini Urus Yellow** (*Giallo Auge* `#FFD600`) — high-visibility motorsport yellow for needles, highlights, active toggles, and critical indicators.
-- **Secondary Background**: **Nero Noctis** (`#0D0D11` to `#16161C`) deep dark mode minimizing driver eye fatigue during night driving.
-- **Material Textures**: Custom procedural **2x2 Twill Carbon Fiber Weave** rendered on Jetpack Compose Canvases with gloss clear-coat gradients.
+AutoVue features an elegant, precision luxury automotive cockpit design language:
+- **Canvas & Surfaces**: **Warm Ivory & Light Cream** (`#F9F6F0` to `#FFFDF9`) warm frosted glassmorphism surfaces paired with deep roasted espresso typography (`#231E19`).
+- **Primary Instrument Accent**: **Cockpit Steel & Burnished Bronze** (`#5A4838`) — mechanical instrumentation highlights, active selector tabs, and structural borders.
+- **Dynamic Automotive Indicators**: Mechanical crimson needles (`CockpitRed` `#DC2626`), fuel/thermal warnings (`CockpitAmber` `#D97706`), and closed-loop efficiency indicators (`CockpitGreen` `#15803D`).
 - **Ergonomics & Touch Targets**: All interactive elements maintain a minimum 48dp touch target size compliant with Android Accessibility Guidelines and usable even during active vehicle vibration.
 - **Responsive Layout Safeguards**: Text fields and readouts incorporate single-line ellipsis rules, horizontal pill shapes, and flex-wrap containers so UI never breaks across screen aspect ratios (16:9, 19.5:9, 21:9 foldables, and tablets).
 
