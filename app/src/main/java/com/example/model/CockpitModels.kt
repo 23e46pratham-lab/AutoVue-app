@@ -9,6 +9,7 @@ data class UserProfileItem(
 
 data class VehicleProfile(
     val profileName: String = "pratham",
+    val vehicleModel: String = "Seat Leon 1.6 FSI",
     val fuelSupply: String = "gasoline",
     val startAndStopEquipped: Boolean = false,
     val displacementCc: Int = 1700,
@@ -31,7 +32,19 @@ data class RefuelingEntry(
     val pricePerLiter: Double,
     val fuelLiters: Double,
     val odometerKm: Double,
-    val afterRefuelingPercent: Double
+    val afterRefuelingPercent: Double,
+    val currency: String = "€",
+    val savePosition: Boolean = true,
+    val locationNotes: String = ""
+)
+
+data class RegionalFuelPreset(
+    val id: String,
+    val regionName: String,
+    val fuelType: String,
+    val pricePerLiter: Double,
+    val currency: String,
+    val isAutoDetected: Boolean = false
 )
 
 data class TripHistoryItem(

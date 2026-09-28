@@ -13,6 +13,7 @@ import com.example.model.HealthPredictionResponse
 import com.example.model.HealthSensorTick
 import com.example.model.ServiceTicket
 import com.example.model.SimulatorStatus
+import com.example.model.TelemetryData
 import com.example.model.TelemetryTick
 import com.example.model.TicketStatus
 import com.example.model.UrgencyLevel
@@ -153,6 +154,58 @@ class SharedTelemetryViewModel(
     private val _tripCostEuro = MutableStateFlow(0.0)
     val tripCostEuro = _tripCostEuro.asStateFlow()
 
+    // ====== Complete Live Fuel & Refueling Management State ======
+    private val _currentFuelLiters = MutableStateFlow(10.8) // 24% of 45L = 10.8L initial
+    val currentFuelLiters = _currentFuelLiters.asStateFlow()
+
+    private val _currentFuelPercent = MutableStateFlow(24.0)
+    val currentFuelPercent = _currentFuelPercent.asStateFlow()
+
+    private val _fuelConsumedTripLiters = MutableStateFlow(0.0)
+    val fuelConsumedTripLiters = _fuelConsumedTripLiters.asStateFlow()
+
+    private val _instantFuelEconomyKmL = MutableStateFlow(14.2)
+    val instantFuelEconomyKmL = _instantFuelEconomyKmL.asStateFlow()
+
+    private val _instantFuelEconomyL100km = MutableStateFlow(7.0)
+    val instantFuelEconomyL100km = _instantFuelEconomyL100km.asStateFlow()
+
+    private val _averageFuelEconomyKmL = MutableStateFlow(14.0)
+    val averageFuelEconomyKmL = _averageFuelEconomyKmL.asStateFlow()
+
+    private val _averageFuelEconomyL100km = MutableStateFlow(7.1)
+    val averageFuelEconomyL100km = _averageFuelEconomyL100km.asStateFlow()
+
+    private val _estimatedRangeKm = MutableStateFlow(152.0)
+    val estimatedRangeKm = _estimatedRangeKm.asStateFlow()
+
+    private val _fuelPricePerLiter = MutableStateFlow(1.78)
+    val fuelPricePerLiter = _fuelPricePerLiter.asStateFlow()
+
+    private val _fuelCurrency = MutableStateFlow("€")
+    val fuelCurrency = _fuelCurrency.asStateFlow()
+
+    val regionalFuelPresets = listOf(
+        com.example.model.RegionalFuelPreset("preset-eu-petrol", "Europe (Central)", "Eurosuper 95", 1.78, "€", isAutoDetected = true),
+        com.example.model.RegionalFuelPreset("preset-eu-diesel", "Europe (Central)", "Diesel", 1.65, "€"),
+        com.example.model.RegionalFuelPreset("preset-in-petrol", "India (Karnataka / National)", "Petrol", 96.72, "₹"),
+        com.example.model.RegionalFuelPreset("preset-in-diesel", "India (Karnataka / National)", "Diesel", 89.62, "₹"),
+        com.example.model.RegionalFuelPreset("preset-us-regular", "United States (National Avg)", "Regular Unleaded 87", 0.92, "$"),
+        com.example.model.RegionalFuelPreset("preset-uk-petrol", "United Kingdom", "Premium Unleaded 95", 1.45, "£")
+    )
+
+    private val _selectedFuelPreset = MutableStateFlow(regionalFuelPresets[0])
+    val selectedFuelPreset = _selectedFuelPreset.asStateFlow()
+
+    private val _isCustomFuelPrice = MutableStateFlow(false)
+    val isCustomFuelPrice = _isCustomFuelPrice.asStateFlow()
+
+    private val _costPerKm = MutableStateFlow(0.126)
+    val costPerKm = _costPerKm.asStateFlow()
+
+    private var lastFuelBurnTimestamp = 0L
+    private var lastRangeVoiceAnnouncementTime = 0L
+
     private val _refuelingEntries = MutableStateFlow<List<RefuelingEntry>>(
         listOf(
             RefuelingEntry("ref-1", "pratham", "09/09/26 18:42", 52.50, 1.75, 30.0, 59477.0, 100.0)
@@ -219,6 +272,7 @@ class SharedTelemetryViewModel(
     }
 
     private fun showFuelAlert(remainingLiters: Double, rangeKm: Double, avgFcr: Double) {
+        val notif = _notificationSettings.value
         _lowFuelAlert.value = com.example.model.LowFuelAlertState(
             remainingFuelLiters = remainingLiters,
             estimatedRangeKm = rangeKm,
@@ -230,6 +284,23 @@ class SharedTelemetryViewModel(
             delay(8000)
             _lowFuelAlert.value = _lowFuelAlert.value?.copy(isVisible = false)
         }
+
+        if (_voiceAlertsEnabled.value && (notif.lackOfAutonomyVocalAlert || notif.vehicleRangeVocalAlert)) {
+            val tank = _vehicleProfile.value.tankCapacityLiters.toInt()
+            val burnRate = String.format(Locale.US, "%.1f", latestTick.value?.ml?.fuel?.fuelFlowLitersPerHour ?: 1.4)
+            ttsManager.speak("Warning: Low fuel autonomy alert. Estimated range is ${rangeKm.toInt()} kilometers with ${String.format(Locale.US, "%.1f", remainingLiters)} liters remaining in your $tank liter tank. Active burn rate is $burnRate liters per hour. Please refuel soon.")
+        }
+        if (_visualAlertsEnabled.value && notif.generateLackOfAutonomyAlert) {
+            showAlertWithTimeout(
+                com.example.model.ActiveAlert(
+                    id = "alert-fuel-autonomy",
+                    title = "LOW FUEL AUTONOMY",
+                    message = "Fuel range below 50 km (${rangeKm.toInt()} km remaining, ${String.format(Locale.US, "%.1f", remainingLiters)}L in tank).",
+                    actionAdvice = "Find nearest refueling station to prevent fuel starvation.",
+                    severity = com.example.model.AlertSeverity.WARNING
+                )
+            )
+        }
     }
 
     fun resetTripSession() {
@@ -237,7 +308,14 @@ class SharedTelemetryViewModel(
         _lowFuelAlert.value = null
         fuelAlertShown = false
         cumulativeTripFuelUsedLitres = 0.0
+        _fuelConsumedTripLiters.value = 0.0
+        _tripCostEuro.value = 0.0
         lastRecordedGpsPoint = null
+        tripStartedAnnounced = false
+        tripEndedAnnounced = false
+        engineWarmedUpAnnounced = false
+        tripStationaryStartMs = 0L
+        updateEstimatedRange()
     }
 
     private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
@@ -252,6 +330,11 @@ class SharedTelemetryViewModel(
 
     fun updateVehicleProfile(profile: VehicleProfile) {
         _vehicleProfile.value = profile
+        val tank = profile.tankCapacityLiters.coerceAtLeast(1.0)
+        val targetLiters = (profile.fuelLeftPercent / 100.0) * tank
+        _currentFuelLiters.value = targetLiters
+        _currentFuelPercent.value = profile.fuelLeftPercent
+        updateEstimatedRange()
     }
 
     fun toggleStartStop() {
@@ -271,11 +354,121 @@ class SharedTelemetryViewModel(
     }
 
     fun addRefuelingEntry(entry: RefuelingEntry) {
-        _refuelingEntries.value = listOf(entry) + _refuelingEntries.value
-        _vehicleProfile.value = _vehicleProfile.value.copy(
-            odometerKm = entry.odometerKm,
-            fuelLeftPercent = entry.afterRefuelingPercent
+        performRefueling(entry, addedLiters = entry.fuelLiters, afterPercent = entry.afterRefuelingPercent)
+    }
+
+    fun performRefueling(entry: RefuelingEntry, addedLiters: Double = 0.0, afterPercent: Double? = null) {
+        val tank = _vehicleProfile.value.tankCapacityLiters.coerceAtLeast(1.0)
+        val calculatedPercent = when {
+            afterPercent != null && afterPercent > 0.0 -> afterPercent.coerceIn(0.0, 100.0)
+            addedLiters > 0.0 -> {
+                val newLiters = (_currentFuelLiters.value + addedLiters).coerceAtMost(tank)
+                (newLiters / tank) * 100.0
+            }
+            entry.fuelLiters > 0.0 -> {
+                val newLiters = (_currentFuelLiters.value + entry.fuelLiters).coerceAtMost(tank)
+                (newLiters / tank) * 100.0
+            }
+            entry.afterRefuelingPercent > 0.0 -> entry.afterRefuelingPercent.coerceIn(0.0, 100.0)
+            else -> 100.0
+        }
+        val newFuelLiters = (calculatedPercent / 100.0) * tank
+        _currentFuelLiters.value = newFuelLiters
+        _currentFuelPercent.value = calculatedPercent
+        val finalEntry = entry.copy(
+            afterRefuelingPercent = calculatedPercent,
+            fuelLiters = if (entry.fuelLiters > 0.0) entry.fuelLiters else addedLiters
         )
+        _refuelingEntries.value = listOf(finalEntry) + _refuelingEntries.value.filterNot { it.id == finalEntry.id }
+        _vehicleProfile.value = _vehicleProfile.value.copy(
+            odometerKm = if (finalEntry.odometerKm > 0) finalEntry.odometerKm else _vehicleProfile.value.odometerKm,
+            fuelLeftPercent = calculatedPercent
+        )
+        updateEstimatedRange()
+        fuelAlertShown = false
+
+        if (_voiceAlertsEnabled.value) {
+            val addedStr = String.format(Locale.US, "%.1f", if (finalEntry.fuelLiters > 0) finalEntry.fuelLiters else addedLiters)
+            ttsManager.speak("Refueling recorded. $addedStr liters added. Fuel level is now ${calculatedPercent.toInt()} percent. Estimated range is ${_estimatedRangeKm.value.toInt()} kilometers.")
+        }
+    }
+
+    fun deleteRefuelingEntry(id: String) {
+        _refuelingEntries.value = _refuelingEntries.value.filterNot { it.id == id }
+    }
+
+    fun resetFuelLevelToFull() {
+        val tank = _vehicleProfile.value.tankCapacityLiters.coerceAtLeast(1.0)
+        _currentFuelLiters.value = tank
+        _currentFuelPercent.value = 100.0
+        _vehicleProfile.value = _vehicleProfile.value.copy(fuelLeftPercent = 100.0)
+        updateEstimatedRange()
+        fuelAlertShown = false
+        if (_voiceAlertsEnabled.value) {
+            ttsManager.speak("Fuel tank level reset to full. 100 percent capacity available. Estimated range is ${_estimatedRangeKm.value.toInt()} kilometers.")
+        }
+    }
+
+    fun selectRegionalPricePreset(preset: com.example.model.RegionalFuelPreset) {
+        _selectedFuelPreset.value = preset
+        _isCustomFuelPrice.value = false
+        _fuelPricePerLiter.value = preset.pricePerLiter
+        _fuelCurrency.value = preset.currency
+        updateEstimatedRange()
+    }
+
+    fun setCustomFuelPriceOverride(price: Double, currency: String = "€") {
+        if (price > 0.0) {
+            _fuelPricePerLiter.value = price
+            _fuelCurrency.value = currency
+            _isCustomFuelPrice.value = true
+            updateEstimatedRange()
+        }
+    }
+
+    fun updateFuelPrice(price: Double, currency: String = "€") {
+        setCustomFuelPriceOverride(price, currency)
+    }
+
+    fun setFuelRangeAutonomyThresholds(rangeKm: Int, percent: Int) {
+        _notificationSettings.value = _notificationSettings.value.copy(
+            fuelRangeAutonomyThresholdKm = rangeKm.coerceIn(15, 200),
+            lowFuelWarningThresholdPercent = percent.coerceIn(5, 40)
+        )
+    }
+
+    fun speakVehicleRange() {
+        val range = _estimatedRangeKm.value.toInt()
+        val liters = String.format(Locale.US, "%.1f", _currentFuelLiters.value)
+        val percent = _currentFuelPercent.value.toInt()
+        val tank = _vehicleProfile.value.tankCapacityLiters.toInt()
+        val avgKmpl = String.format(Locale.US, "%.1f", _averageFuelEconomyKmL.value)
+        val burnRate = String.format(
+            Locale.US,
+            "%.1f",
+            latestTick.value?.ml?.fuel?.fuelFlowLitersPerHour ?: if (latestTick.value?.data?.maf != null && latestTick.value!!.data.maf > 0.1) {
+                ((latestTick.value!!.data.maf / 14.7) / 730.0) * 3600.0
+            } else 0.65
+        )
+        val text = "Estimated vehicle range is $range kilometers. You have $liters liters remaining out of a $tank liter tank, at $percent percent capacity. Current burn rate is $burnRate liters per hour with average fuel economy of $avgKmpl kilometers per liter."
+        ttsManager.speak(text)
+    }
+
+    private fun updateEstimatedRange() {
+        val avgL100km = if (_averageFuelEconomyL100km.value > 1.0) {
+            _averageFuelEconomyL100km.value
+        } else {
+            _vehicleProfile.value.consumptionL100km.coerceAtLeast(4.0)
+        }
+        val range = (_currentFuelLiters.value / avgL100km) * 100.0
+        _estimatedRangeKm.value = range.coerceAtLeast(0.0)
+
+        val dist = _tripDistanceKm.value
+        if (dist > 0.05) {
+            _costPerKm.value = _tripCostEuro.value / dist
+        } else {
+            _costPerKm.value = (avgL100km / 100.0) * _fuelPricePerLiter.value
+        }
     }
 
     fun toggleVoiceAlerts() {
@@ -340,25 +533,32 @@ class SharedTelemetryViewModel(
             throttlePos = throttle
         )
         _detectedAnomalies.value = (listOf(record) + _detectedAnomalies.value).take(50)
-        _activeAlert.value = com.example.model.ActiveAlert(
-            id = "alert-anomaly",
-            title = "HEALTH ANOMALY DETECTED",
-            message = "Abnormal reading in ${triggered.joinToString(", ")}.",
-            actionAdvice = "Check sensor readings or run OBD-II diagnostic scan.",
-            severity = com.example.model.AlertSeverity.WARNING
-        )
-        if (_voiceAlertsEnabled.value) {
+        val notif = _notificationSettings.value
+        if (_voiceAlertsEnabled.value && notif.anomalyVocalAlert) {
             ttsManager.speak("Warning: Vehicle anomaly detected in ${triggered.joinToString(", ")}.")
+        }
+        if (_visualAlertsEnabled.value && notif.generateAnomalyAlert) {
+            showAlertWithTimeout(
+                com.example.model.ActiveAlert(
+                    id = "alert-anomaly",
+                    title = "HEALTH ANOMALY DETECTED",
+                    message = "Abnormal reading in ${triggered.joinToString(", ")}.",
+                    actionAdvice = "Check sensor readings or run OBD-II diagnostic scan.",
+                    severity = com.example.model.AlertSeverity.WARNING
+                )
+            )
         }
     }
 
     fun triggerTestAlert() {
-        _activeAlert.value = com.example.model.ActiveAlert(
-            id = "test-${System.currentTimeMillis()}",
-            title = "SPEED LIMIT WARNING",
-            message = "Current vehicle speed is 128 km/h.",
-            actionAdvice = "Maximum recommended speed is 120 km/h. Ease throttle.",
-            severity = com.example.model.AlertSeverity.WARNING
+        showAlertWithTimeout(
+            com.example.model.ActiveAlert(
+                id = "test-${System.currentTimeMillis()}",
+                title = "SPEED LIMIT WARNING",
+                message = "Current vehicle speed is 128 km/h.",
+                actionAdvice = "Maximum recommended speed is 120 km/h. Ease throttle.",
+                severity = com.example.model.AlertSeverity.WARNING
+            )
         )
     }
 
@@ -425,6 +625,29 @@ class SharedTelemetryViewModel(
     private var lastAnomalyRecordTime = 0L
     private var windowCounter = 0
 
+    // Lifecycle, Debounce & Benchmark state variables
+    private var alertDismissJob: Job? = null
+    private var tripStartedAnnounced = false
+    private var tripEndedAnnounced = false
+    private var engineWarmedUpAnnounced = false
+    private var tripStationaryStartMs = 0L
+    private var lastDrivingDurationAlertTime = 0L
+    private var lastConsumptionAlertTime = 0L
+    private var lastColdEngineAlertTime = 0L
+    private var lastOverheatAlertTime = 0L
+    private var lastHighRpmAlertTime = 0L
+    private var lastMaxPowerAlertTime = 0L
+    private var lastMaxTorqueAlertTime = 0L
+
+    // Performance benchmark tracking
+    private var accel0StartMs = 0L
+    private var pickup40StartMs = 0L
+    private var pickup60StartMs = 0L
+    private var pickup80StartMs = 0L
+    private var pickup90StartMs = 0L
+    private var brake100StartMs = 0L
+    private var brake50StartMs = 0L
+
     init {
         startObserving()
         startPollingFallback()
@@ -447,6 +670,97 @@ class SharedTelemetryViewModel(
                         _dtcCodes.value = codes.map { com.example.utils.DtcDecoder.decode(it) }
                     }
 
+                    val now = System.currentTimeMillis()
+
+                    // ====== Universal Dynamic Fuel Consumption & Burn Rate ======
+                    val dtSeconds = if (lastFuelBurnTimestamp > 0L) {
+                        ((now - lastFuelBurnTimestamp).coerceIn(100L, 3000L)) / 1000.0
+                    } else {
+                        1.0
+                    }
+                    lastFuelBurnTimestamp = now
+
+                    // Flow rate in Litres per Hour
+                    val flowLph = when {
+                        tick.ml?.fuel?.fuelFlowLitersPerHour != null && tick.ml.fuel.fuelFlowLitersPerHour > 0.0 ->
+                            tick.ml.fuel.fuelFlowLitersPerHour
+                        tick.ml?.fuel?.fcrGs != null && tick.ml.fuel.fcrGs > 0.0 ->
+                            (tick.ml.fuel.fcrGs / 730.0) * 3600.0
+                        tick.data.maf > 0.1 ->
+                            (tick.data.maf / 14.7 / 730.0) * 3600.0
+                        tick.data.rpm > 100 ->
+                            (tick.data.rpm / 2800.0) * (0.65 + (tick.data.throttlePos / 100.0) * 3.8)
+                        else -> 0.65 // standard 1.6L warm engine idle
+                    }
+
+                    val deltaFuelBurnLiters = (flowLph / 3600.0) * dtSeconds
+                    val tankCapacity = _vehicleProfile.value.tankCapacityLiters.coerceAtLeast(1.0)
+
+                    // Decrement live tracked fuel level
+                    val newFuelLiters = (_currentFuelLiters.value - deltaFuelBurnLiters).coerceAtLeast(0.0)
+                    _currentFuelLiters.value = newFuelLiters
+                    val newFuelPercent = ((newFuelLiters / tankCapacity) * 100.0).coerceIn(0.0, 100.0)
+                    _currentFuelPercent.value = newFuelPercent
+                    _vehicleProfile.value = _vehicleProfile.value.copy(fuelLeftPercent = newFuelPercent)
+
+                    // Accumulate session/trip fuel consumed
+                    val newTotalConsumed = _fuelConsumedTripLiters.value + deltaFuelBurnLiters
+                    _fuelConsumedTripLiters.value = newTotalConsumed
+                    cumulativeTripFuelUsedLitres = newTotalConsumed
+                    _tripCostEuro.value = newTotalConsumed * _fuelPricePerLiter.value
+
+                    // Distance step from speed (km)
+                    val deltaSpeedDistKm = (tick.data.vss / 3600.0) * dtSeconds
+                    if (deltaSpeedDistKm > 0.0) {
+                        _tripDistanceKm.value += deltaSpeedDistKm
+                    }
+
+                    // Instantaneous Fuel Economy
+                    val instantKmL = if (tick.data.vss > 2.0 && flowLph > 0.05) {
+                        (tick.data.vss / flowLph).coerceIn(0.5, 50.0)
+                    } else {
+                        0.0
+                    }
+                    val instantL100km = if (instantKmL > 0.1) {
+                        (100.0 / instantKmL).coerceIn(1.0, 45.0)
+                    } else {
+                        0.0
+                    }
+                    _instantFuelEconomyKmL.value = instantKmL
+                    _instantFuelEconomyL100km.value = instantL100km
+
+                    // Average Fuel Economy (km/L and L/100km)
+                    val totalDist = _tripDistanceKm.value
+                    val (avgKmL, avgL100km) = if (totalDist > 0.05 && newTotalConsumed > 0.005) {
+                        val kmpl = (totalDist / newTotalConsumed).coerceIn(2.0, 35.0)
+                        val l100 = (100.0 / kmpl).coerceIn(2.8, 30.0)
+                        Pair(kmpl, l100)
+                    } else {
+                        val profileL100 = _vehicleProfile.value.consumptionL100km.coerceAtLeast(3.0)
+                        Pair(100.0 / profileL100, profileL100)
+                    }
+                    _averageFuelEconomyKmL.value = avgKmL
+                    _averageFuelEconomyL100km.value = avgL100km
+
+                    // Estimated Range based on tank capacity, current fuel level and burn rate
+                    val estRange = (newFuelLiters / avgL100km) * 100.0
+                    _estimatedRangeKm.value = estRange.coerceAtLeast(0.0)
+
+                    // Cost per km
+                    if (totalDist > 0.05) {
+                        _costPerKm.value = _tripCostEuro.value / totalDist
+                    } else {
+                        _costPerKm.value = (avgL100km / 100.0) * _fuelPricePerLiter.value
+                    }
+
+                    // Low Fuel & Range Alert check
+                    val lowFuelPctThresh = _notificationSettings.value.lowFuelWarningThresholdPercent.toDouble()
+                    val lowRangeKmThresh = _notificationSettings.value.fuelRangeAutonomyThresholdKm.toDouble()
+                    if (!fuelAlertShown && (newFuelPercent < lowFuelPctThresh || estRange < lowRangeKmThresh)) {
+                        fuelAlertShown = true
+                        showFuelAlert(newFuelLiters, estRange, avgL100km)
+                    }
+
                     // Process Live GPS coordinates & Trip Tick Buffer
                     if (tick.data.hasGps) {
                         val lat = tick.data.lat
@@ -460,29 +774,7 @@ class SharedTelemetryViewModel(
                                 _liveGpsTrail.value = currentGpsList
                             }
 
-                            // Calculate segment distance for trip fuel calculation
-                            val prevPt = lastRecordedGpsPoint
-                            val segmentDistKm = if (prevPt != null) {
-                                haversineKm(prevPt.first, prevPt.second, lat, lon)
-                            } else {
-                                0.0
-                            }
                             lastRecordedGpsPoint = Pair(lat, lon)
-
-                            // Instant fuel consumption (L/100km)
-                            val instantFcr = if (tick.data.maf > 0.1 && tick.data.vss > 5.0) {
-                                ((tick.data.maf * 33.09) / tick.data.vss).coerceIn(1.0, 40.0)
-                            } else if (tick.data.vss > 5.0 && tick.data.throttlePos > 0.0) {
-                                (tick.data.throttlePos * 0.22).coerceIn(2.0, 30.0)
-                            } else if (tick.data.throttlePos > 0.0) {
-                                (tick.data.throttlePos * 0.15).coerceIn(0.0, 15.0)
-                            } else {
-                                0.0
-                            }
-
-                            if (segmentDistKm > 0.0) {
-                                cumulativeTripFuelUsedLitres += (instantFcr / 100.0) * segmentDistKm
-                            }
 
                             val drivingProfile = tick.drivingProfile 
                                 ?: tick.data.drivingProfile 
@@ -501,7 +793,7 @@ class SharedTelemetryViewModel(
                                 rpm = tick.data.rpm,
                                 throttlePos = tick.data.throttlePos,
                                 maf = tick.data.maf,
-                                instantConsumption = instantFcr,
+                                instantConsumption = if (instantL100km > 0.0) instantL100km else 6.5,
                                 drivingProfile = drivingProfile,
                                 anomalyScore = anomalyScore,
                                 gpsBearing = tick.data.gpsBearing ?: 0.0,
@@ -514,31 +806,6 @@ class SharedTelemetryViewModel(
                                 currentTripBuffer.removeAt(0)
                             }
                             _tripTickBuffer.value = currentTripBuffer
-
-                            // Task 3: Refueling Station Awareness alert check
-                            if (!fuelAlertShown && _vehicleProfile.value.tankCapacityLiters > 0) {
-                                val lastRefuel = _refuelingEntries.value.firstOrNull()
-                                val tankLitres = _vehicleProfile.value.tankCapacityLiters
-                                val fuelAtStart = if (lastRefuel != null) {
-                                    (lastRefuel.afterRefuelingPercent / 100.0) * tankLitres
-                                } else {
-                                    (_vehicleProfile.value.fuelLeftPercent / 100.0) * tankLitres
-                                }
-                                val remainingLiters = (fuelAtStart - cumulativeTripFuelUsedLitres).coerceAtLeast(0.0)
-                                val avgFcr = if (_tripDistanceKm.value > 0.1 && cumulativeTripFuelUsedLitres > 0.01) {
-                                    (cumulativeTripFuelUsedLitres / _tripDistanceKm.value) * 100.0
-                                } else if (instantFcr > 0.0) {
-                                    instantFcr
-                                } else {
-                                    _vehicleProfile.value.consumptionL100km
-                                }
-                                val rangeKm = if (avgFcr > 0.0) (remainingLiters / avgFcr) * 100.0 else null
-
-                                if (rangeKm != null && rangeKm < 50.0) {
-                                    showFuelAlert(remainingLiters, rangeKm, avgFcr)
-                                    fuelAlertShown = true
-                                }
-                            }
                         }
                     }
 
@@ -553,12 +820,12 @@ class SharedTelemetryViewModel(
                         ml.driverBehaviour?.let { db ->
                             _driverBehaviour.value = db
                             receivedMl = true
-                            db.ttsMessage?.let { msg ->
-                                val now = System.currentTimeMillis()
-                                if (_voiceAlertsEnabled.value && now - lastBehaviourTtsTime > 25000) {
-                                    ttsManager.speak(msg)
-                                    lastBehaviourTtsTime = now
-                                }
+                            // STRICT REQUIREMENT: Only play voice warning when behaviour is aggressive
+                            // Never speak "great driving", eco, or normal messages
+                            val isAggressive = db.label.contains("aggressive", ignoreCase = true) ||
+                                    db.behaviourClass.contains("aggressive", ignoreCase = true)
+                            if (isAggressive) {
+                                handleAggressiveDrivingAlert(db.ttsMessage)
                             }
                         }
                         ml.fuel?.let { fp ->
@@ -571,7 +838,6 @@ class SharedTelemetryViewModel(
                         }
                     }
                     
-                    val now = System.currentTimeMillis()
                     // Fallback periodic polling if WebSocket tick.ml is still warming up (~30 ticks)
                     if (tick.ml?.health == null && now - lastHealthPredictionTime > 6000) {
                         lastHealthPredictionTime = now
@@ -627,34 +893,83 @@ class SharedTelemetryViewModel(
         }
 
         if (now - lastAnomalyAlertTime < 30000) return
+        lastAnomalyAlertTime = now
 
+        val notif = _notificationSettings.value
         val triggeredDesc = if (!health.triggeredFeatures.isNullOrEmpty()) {
             health.triggeredFeatures.joinToString(", ")
         } else {
             "critical engine sensors"
         }
         val alertMsg = "Warning: Vehicle anomaly detected in $triggeredDesc."
-        if (_voiceAlertsEnabled.value) {
+        if (_voiceAlertsEnabled.value && notif.anomalyVocalAlert) {
             ttsManager.speak(alertMsg)
         }
-        if (_visualAlertsEnabled.value) {
-            _visualAlertEvent.tryEmit(alertMsg)
-            _activeAlert.value = com.example.model.ActiveAlert(
-                id = "alert-anomaly",
-                title = "HEALTH ANOMALY DETECTED",
-                message = "Abnormal reading in $triggeredDesc.",
-                actionAdvice = "Check sensor readings or run OBD-II diagnostic scan.",
-                severity = com.example.model.AlertSeverity.WARNING
+        if (_visualAlertsEnabled.value && notif.generateAnomalyAlert) {
+            showAlertWithTimeout(
+                com.example.model.ActiveAlert(
+                    id = "alert-anomaly",
+                    title = "HEALTH ANOMALY DETECTED",
+                    message = "Abnormal reading in $triggeredDesc.",
+                    actionAdvice = "Check sensor readings or run OBD-II diagnostic scan.",
+                    severity = com.example.model.AlertSeverity.WARNING
+                )
             )
         }
-        lastAnomalyAlertTime = now
+    }
+
+    private fun handleAggressiveDrivingAlert(customMsg: String?) {
+        val notif = _notificationSettings.value
+        val now = System.currentTimeMillis()
+        if (now - lastBehaviourTtsTime < 25000L) return
+        lastBehaviourTtsTime = now
+
+        val vocalText = if (!customMsg.isNullOrBlank() && (customMsg.contains("aggressive", ignoreCase = true) || customMsg.contains("harsh", ignoreCase = true) || customMsg.contains("throttle", ignoreCase = true))) {
+            customMsg
+        } else {
+            "Warning: Aggressive driving behaviour detected. Smooth out pedal input."
+        }
+
+        if (_voiceAlertsEnabled.value && notif.styleDrivingVocalMessage) {
+            ttsManager.speak(vocalText)
+        }
+
+        if (_visualAlertsEnabled.value && notif.generateStyleDrivingMessage) {
+            showAlertWithTimeout(
+                com.example.model.ActiveAlert(
+                    id = "alert-aggressive-driving",
+                    title = "AGGRESSIVE DRIVING DETECTED",
+                    message = "High throttle acceleration and dynamic load detected. Ease pedal.",
+                    actionAdvice = "Smooth pedal transitions conserve fuel and protect powertrain.",
+                    severity = com.example.model.AlertSeverity.WARNING
+                )
+            )
+        }
+    }
+
+    fun showAlertWithTimeout(alert: com.example.model.ActiveAlert) {
+        _activeAlert.value = alert
+        _visualAlertEvent.tryEmit(alert.message)
+
+        alertDismissJob?.cancel()
+        if (alert.severity != com.example.model.AlertSeverity.CRITICAL) {
+            val timeoutSec = _notificationSettings.value.timeOutDisplayMessageSec.coerceIn(1, 15)
+            alertDismissJob = viewModelScope.launch {
+                delay(timeoutSec * 1000L)
+                if (_activeAlert.value?.id == alert.id) {
+                    _activeAlert.value = null
+                }
+            }
+        }
     }
 
     private fun checkAndSpeakAlerts(tick: TelemetryTick) {
         val d = tick.data
         val notif = _notificationSettings.value
-        val speedLimit = notif.overspeedingMessageOverKmh.toDouble()
+        val now = System.currentTimeMillis()
 
+        // Auto clear speed/rpm alerts when back in safe envelope
+        val speedLimit = notif.overspeedingMessageOverKmh.toDouble()
         if (d.vss <= speedLimit && d.rpm <= 6000 && d.coolantTemp <= 100) {
             val current = _activeAlert.value
             if (current != null && (current.id == "alert-speed" || current.id == "alert-rpm" || current.id == "alert-coolant")) {
@@ -662,81 +977,412 @@ class SharedTelemetryViewModel(
             }
         }
 
-        if (!_voiceAlertsEnabled.value && !_visualAlertsEnabled.value) return
-        
-        val now = System.currentTimeMillis()
-        val debounceMs = (notif.overspeedingAlertTimeOutSec * 1000L).coerceAtLeast(8000L)
-        if (now - lastVoiceAlertTime < debounceMs) return // Debounce alerts
-
-        var alertMsg: String? = null
-        var alertObj: com.example.model.ActiveAlert? = null
-        var isVoiceAllowed = true
-        
-        if (d.vss > speedLimit && notif.generateOverspeedingAlert) {
-            alertMsg = notif.overspeedingAlertText.ifEmpty {
-                "Warning: Speed limit exceeded. Current speed is ${d.vss.toInt()} km/h."
+        // 1. Trip Start / End Alert & Voice
+        if (d.vss > 5.0 && !tripStartedAnnounced) {
+            tripStartedAnnounced = true
+            tripEndedAnnounced = false
+            if (_voiceAlertsEnabled.value && notif.startTripVocalMessage) {
+                ttsManager.speak("Trip started. Drive safely.")
             }
-            alertObj = com.example.model.ActiveAlert(
-                id = "alert-speed",
-                title = "OVERSPEEDING ALERT",
-                message = "${alertMsg} (${d.vss.toInt()} km/h > ${speedLimit.toInt()} km/h limit).",
-                actionAdvice = "Ease throttle pedal to maintain safe stopping distance.",
-                severity = com.example.model.AlertSeverity.WARNING
-            )
-            isVoiceAllowed = notif.overspeedingVocalAlert
-        } else if (d.coolantTemp > 100) {
-            alertMsg = "Critical Warning: Engine coolant temperature is too high (${d.coolantTemp.toInt()}°C). Please pull over safely."
-            alertObj = com.example.model.ActiveAlert(
-                id = "alert-coolant",
-                title = "COOLANT OVERHEAT",
-                message = "Coolant temperature is ${d.coolantTemp.toInt()}°C (Normal: 85-92°C).",
-                actionAdvice = "Pull over safely and shut off engine to prevent overheating.",
-                severity = com.example.model.AlertSeverity.CRITICAL
-            )
-            isVoiceAllowed = true
-        } else if (d.rpm > 6000) {
-            alertMsg = "Warning: High engine RPM detected (${d.rpm.toInt()} RPM)."
-            alertObj = com.example.model.ActiveAlert(
-                id = "alert-rpm",
-                title = "HIGH ENGINE RPM",
-                message = "Engine speed reached ${d.rpm.toInt()} RPM near redline.",
-                actionAdvice = "Shift to higher gear to protect engine.",
-                severity = com.example.model.AlertSeverity.WARNING
-            )
-            isVoiceAllowed = true
-        } else if (d.coolantTemp in 85.0..92.0 && notif.generateEngineOperatingTempMessage && (tick.rowIndex % 200 == 0)) {
-            alertMsg = notif.warningTextEngineOperatingTemp
-            alertObj = com.example.model.ActiveAlert(
-                id = "alert-operating-temp",
-                title = "ENGINE AT OPERATING TEMPERATURE",
-                message = notif.warningTextEngineOperatingTemp,
-                actionAdvice = "Engine is fully warmed up and at peak thermodynamic efficiency.",
-                severity = com.example.model.AlertSeverity.INFO
-            )
-            isVoiceAllowed = notif.engineOperatingTempVocalMessage
-        } else if (d.coolantTemp < 60.0 && d.rpm > 3500 && notif.generateLowEngineTempMessage) {
-            alertMsg = notif.warningTextLowEngineTemp
-            alertObj = com.example.model.ActiveAlert(
-                id = "alert-low-temp",
-                title = "COLD ENGINE WARNING",
-                message = notif.warningTextLowEngineTemp,
-                actionAdvice = "Keep RPM below 3000 until engine reaches operating temperature.",
-                severity = com.example.model.AlertSeverity.WARNING
-            )
-            isVoiceAllowed = notif.lowEngineTempVocalAlert
-        }
-        
-        if (alertMsg != null) {
-            if (_voiceAlertsEnabled.value && isVoiceAllowed) {
-                ttsManager.speak(alertMsg)
+            if (_visualAlertsEnabled.value && notif.generateStartTripMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-trip-start",
+                        title = "TRIP STARTED",
+                        message = "Trip telemetry recording initiated. Drive safely.",
+                        actionAdvice = "Vehicle speed and engine parameters are monitored.",
+                        severity = com.example.model.AlertSeverity.INFO
+                    )
+                )
             }
-            if (_visualAlertsEnabled.value) {
-                _visualAlertEvent.tryEmit(alertMsg)
-                if (alertObj != null) {
-                    _activeAlert.value = alertObj
+        } else if (tripStartedAnnounced && !tripEndedAnnounced && d.vss < 1.0 && _tripDistanceKm.value > 0.2) {
+            if (tripStationaryStartMs == 0L) {
+                tripStationaryStartMs = now
+            } else if (now - tripStationaryStartMs > 15000L) {
+                tripEndedAnnounced = true
+                if (_voiceAlertsEnabled.value && notif.endTripVocalMessage) {
+                    ttsManager.speak("Trip completed. Drive safely.")
+                }
+                if (_visualAlertsEnabled.value && notif.generateEndTripMessage) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-trip-end",
+                            title = "TRIP COMPLETED",
+                            message = "Trip concluded. Total distance: ${String.format(Locale.US, "%.1f", _tripDistanceKm.value)} km.",
+                            actionAdvice = "Review trip statistics and fuel economy summary.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
                 }
             }
+        } else if (d.vss >= 1.0) {
+            tripStationaryStartMs = 0L
+        }
+
+        // 2. Driving Duration Reminder Alert
+        if (notif.drivingDurationMessageMin > 0 && _tripElapsedTimeMinutes.value >= notif.drivingDurationMessageMin) {
+            if (now - lastDrivingDurationAlertTime > 1800000L) {
+                lastDrivingDurationAlertTime = now
+                if (_voiceAlertsEnabled.value && notif.drivingDurationVocalAlert) {
+                    ttsManager.speak("You have been driving for ${_tripElapsedTimeMinutes.value} minutes. Please take a rest break.")
+                }
+                if (_visualAlertsEnabled.value && notif.generateDrivingDurationAlert) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-driving-duration",
+                            title = "DRIVER FATIGUE REMINDER",
+                            message = "You have been driving for ${_tripElapsedTimeMinutes.value} minutes.",
+                            actionAdvice = "Consider taking a short rest break to stay alert.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // 3. High Instantaneous Fuel Consumption Alert
+        val speedKmh = d.vss
+        val instantFcr = if (speedKmh > 2.0 && d.maf > 0.1) {
+            ((d.maf / 14.7) / 730.0) * 3600.0 / speedKmh * 100.0
+        } else 0.0
+
+        if (instantFcr > 16.0 && d.throttlePos > 65.0 && now - lastConsumptionAlertTime > 45000L) {
+            lastConsumptionAlertTime = now
+            if (_voiceAlertsEnabled.value && notif.consumptionVocalMessage) {
+                ttsManager.speak("High fuel consumption detected.")
+            }
+            if (_visualAlertsEnabled.value && notif.generateConsumptionMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-high-consumption",
+                        title = "HIGH FUEL CONSUMPTION",
+                        message = "Current fuel rate is ${String.format(Locale.US, "%.1f", instantFcr)} L/100km.",
+                        actionAdvice = "Ease throttle pedal and shift to higher gear to conserve fuel.",
+                        severity = com.example.model.AlertSeverity.WARNING
+                    )
+                )
+            }
+        }
+
+        // 4. Engine Coolant Temperature Alerts
+        if (d.coolantTemp > 100.0 && now - lastOverheatAlertTime > 25000L) {
+            lastOverheatAlertTime = now
+            if (_voiceAlertsEnabled.value && notif.coolantOverheatVocalAlert) {
+                ttsManager.speak("Critical Warning: Engine coolant temperature is too high. Please pull over safely.")
+            }
+            if (_visualAlertsEnabled.value && notif.generateCoolantOverheatAlert) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-coolant",
+                        title = "COOLANT OVERHEAT",
+                        message = "Coolant temperature is ${d.coolantTemp.toInt()}°C (Normal: 85-92°C).",
+                        actionAdvice = "Pull over safely and shut off engine to prevent overheating.",
+                        severity = com.example.model.AlertSeverity.CRITICAL
+                    )
+                )
+            }
+        } else if (d.coolantTemp in 85.0..92.0 && !engineWarmedUpAnnounced) {
+            engineWarmedUpAnnounced = true
+            if (_voiceAlertsEnabled.value && notif.engineOperatingTempVocalMessage) {
+                ttsManager.speak(notif.warningTextEngineOperatingTemp)
+            }
+            if (_visualAlertsEnabled.value && notif.generateEngineOperatingTempMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-operating-temp",
+                        title = "ENGINE AT OPERATING TEMPERATURE",
+                        message = notif.warningTextEngineOperatingTemp,
+                        actionAdvice = "Engine is fully warmed up and at peak thermodynamic efficiency.",
+                        severity = com.example.model.AlertSeverity.INFO
+                    )
+                )
+            }
+        } else if (d.coolantTemp < 60.0 && d.rpm > 3500.0 && now - lastColdEngineAlertTime > 40000L) {
+            lastColdEngineAlertTime = now
+            if (_voiceAlertsEnabled.value && notif.lowEngineTempVocalAlert) {
+                ttsManager.speak(notif.warningTextLowEngineTemp)
+            }
+            if (_visualAlertsEnabled.value && notif.generateLowEngineTempMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-low-temp",
+                        title = "COLD ENGINE WARNING",
+                        message = notif.warningTextLowEngineTemp,
+                        actionAdvice = "Keep RPM below 3000 until engine reaches operating temperature.",
+                        severity = com.example.model.AlertSeverity.WARNING
+                    )
+                )
+            }
+        }
+
+        // 5. Engine RPM High Alert
+        if (d.rpm > 6000.0 && now - lastHighRpmAlertTime > 20000L) {
+            lastHighRpmAlertTime = now
+            if (_voiceAlertsEnabled.value && notif.highRpmVocalAlert) {
+                ttsManager.speak("Warning: High engine RPM detected. Shift to higher gear.")
+            }
+            if (_visualAlertsEnabled.value && notif.generateHighRpmAlert) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-rpm",
+                        title = "HIGH ENGINE RPM",
+                        message = "Engine speed reached ${d.rpm.toInt()} RPM near redline.",
+                        actionAdvice = "Shift to higher gear to protect engine.",
+                        severity = com.example.model.AlertSeverity.WARNING
+                    )
+                )
+            }
+        }
+
+        // 6. Overspeeding Alert
+        val overspeedDebounceMs = (notif.overspeedingAlertTimeOutSec * 1000L).coerceAtLeast(8000L)
+        if (d.vss > speedLimit && now - lastVoiceAlertTime > overspeedDebounceMs) {
             lastVoiceAlertTime = now
+            val alertMsg = notif.overspeedingAlertText.ifEmpty {
+                "Slow down. Current speed is ${d.vss.toInt()} km/h."
+            }
+            if (_voiceAlertsEnabled.value && notif.overspeedingVocalAlert) {
+                ttsManager.speak(alertMsg)
+            }
+            if (_visualAlertsEnabled.value && notif.generateOverspeedingAlert) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-speed",
+                        title = "OVERSPEEDING ALERT",
+                        message = "${alertMsg} (${d.vss.toInt()} km/h > ${speedLimit.toInt()} km/h limit).",
+                        actionAdvice = "Ease throttle pedal to maintain safe stopping distance.",
+                        severity = com.example.model.AlertSeverity.WARNING
+                    )
+                )
+            }
+        }
+
+        // 7. Performance & Dynamics Benchmarks
+        checkPerformanceBenchmarks(d, notif, now)
+    }
+
+    private fun checkPerformanceBenchmarks(d: TelemetryData, notif: com.example.model.NotificationSettings, now: Long) {
+        val speed = d.vss
+
+        // Track 0 to 100 km/h acceleration
+        if (speed < 5.0 && d.throttlePos > 30.0) {
+            accel0StartMs = now
+        } else if (speed >= 100.0 && accel0StartMs > 0L) {
+            val elapsedSec = (now - accel0StartMs) / 1000.0
+            accel0StartMs = 0L
+            if (elapsedSec in 2.5..35.0) {
+                if (_voiceAlertsEnabled.value && notif.acceleration0To100VocalMessage) {
+                    ttsManager.speak("Zero to one hundred kilometers per hour achieved in ${String.format(Locale.US, "%.1f", elapsedSec)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generateAccel0To100Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-accel-100",
+                            title = "ACCELERATION 0-100 KM/H",
+                            message = "0 to 100 km/h completed in ${String.format(Locale.US, "%.1f", elapsedSec)} s.",
+                            actionAdvice = "Benchmark recorded in performance log.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Track 0 to 50 km/h acceleration
+        if (speed >= 50.0 && accel0StartMs > 0L && speed < 60.0) {
+            val elapsedSec = (now - accel0StartMs) / 1000.0
+            if (elapsedSec in 1.2..15.0 && (notif.generateAccel0To50Message || notif.accel0To50VocalMessage)) {
+                if (_voiceAlertsEnabled.value && notif.accel0To50VocalMessage) {
+                    ttsManager.speak("Zero to fifty kilometers per hour achieved in ${String.format(Locale.US, "%.1f", elapsedSec)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generateAccel0To50Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-accel-50",
+                            title = "ACCELERATION 0-50 KM/H",
+                            message = "0 to 50 km/h completed in ${String.format(Locale.US, "%.1f", elapsedSec)} s.",
+                            actionAdvice = "Launch benchmark recorded.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Pickup 40 to 70 km/h
+        if (speed in 38.0..42.0 && d.throttlePos > 35.0) {
+            pickup40StartMs = now
+        } else if (speed >= 70.0 && pickup40StartMs > 0L) {
+            val elapsed = (now - pickup40StartMs) / 1000.0
+            pickup40StartMs = 0L
+            if (elapsed in 1.0..20.0) {
+                if (_voiceAlertsEnabled.value && notif.pickup40To70VocalMessage) {
+                    ttsManager.speak("Pickup 40 to 70 completed in ${String.format(Locale.US, "%.1f", elapsed)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generatePickup40To70Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-pickup-40-70",
+                            title = "PICKUP 40-70 KM/H",
+                            message = "Pickup 40-70 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "In-gear acceleration benchmark logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Pickup 60 to 100 km/h
+        if (speed in 58.0..62.0 && d.throttlePos > 35.0) {
+            pickup60StartMs = now
+        } else if (speed >= 100.0 && pickup60StartMs > 0L) {
+            val elapsed = (now - pickup60StartMs) / 1000.0
+            pickup60StartMs = 0L
+            if (elapsed in 1.5..25.0) {
+                if (_voiceAlertsEnabled.value && notif.pickup60To100VocalMessage) {
+                    ttsManager.speak("Pickup 60 to 100 completed in ${String.format(Locale.US, "%.1f", elapsed)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generatePickup60To100Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-pickup-60-100",
+                            title = "PICKUP 60-100 KM/H",
+                            message = "Pickup 60-100 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "Overtaking performance logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Pickup 80 to 120 km/h
+        if (speed in 78.0..82.0 && d.throttlePos > 35.0) {
+            pickup80StartMs = now
+        } else if (speed >= 120.0 && pickup80StartMs > 0L) {
+            val elapsed = (now - pickup80StartMs) / 1000.0
+            pickup80StartMs = 0L
+            if (elapsed in 2.0..30.0) {
+                if (_voiceAlertsEnabled.value && notif.pickup80To120VocalMessage) {
+                    ttsManager.speak("Pickup 80 to 120 completed in ${String.format(Locale.US, "%.1f", elapsed)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generatePickup80To120Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-pickup-80-120",
+                            title = "PICKUP 80-120 KM/H",
+                            message = "Pickup 80-120 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "Highway passing test logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Pickup 90 to 130 km/h
+        if (speed in 88.0..92.0 && d.throttlePos > 35.0) {
+            pickup90StartMs = now
+        } else if (speed >= 130.0 && pickup90StartMs > 0L) {
+            val elapsed = (now - pickup90StartMs) / 1000.0
+            pickup90StartMs = 0L
+            if (elapsed in 2.0..35.0) {
+                if (_voiceAlertsEnabled.value && notif.pickup90To130VocalMessage) {
+                    ttsManager.speak("Pickup 90 to 130 completed in ${String.format(Locale.US, "%.1f", elapsed)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generatePickup90To130Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-pickup-90-130",
+                            title = "PICKUP 90-130 KM/H",
+                            message = "Pickup 90-130 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "High-speed passing test logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Braking 100 to 0 km/h
+        if (speed > 98.0) {
+            brake100StartMs = now
+        } else if (speed < 3.0 && brake100StartMs > 0L) {
+            val elapsed = (now - brake100StartMs) / 1000.0
+            brake100StartMs = 0L
+            if (elapsed in 1.5..15.0) {
+                if (_voiceAlertsEnabled.value && notif.brakingVocalAlert) {
+                    ttsManager.speak("Braking 100 to zero completed in ${String.format(Locale.US, "%.1f", elapsed)} seconds.")
+                }
+                if (_visualAlertsEnabled.value && notif.generateBraking100To0Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-brake-100",
+                            title = "BRAKING 100-0 KM/H",
+                            message = "Deceleration 100-0 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "Emergency brake benchmark logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Braking 50 to 0 km/h
+        if (speed in 48.0..54.0 && brake100StartMs == 0L) {
+            brake50StartMs = now
+        } else if (speed < 3.0 && brake50StartMs > 0L) {
+            val elapsed = (now - brake50StartMs) / 1000.0
+            brake50StartMs = 0L
+            if (elapsed in 1.0..10.0) {
+                if (_visualAlertsEnabled.value && notif.generateBraking50To0Message) {
+                    showAlertWithTimeout(
+                        com.example.model.ActiveAlert(
+                            id = "alert-brake-50",
+                            title = "BRAKING 50-0 KM/H",
+                            message = "Braking 50-0 km/h achieved in ${String.format(Locale.US, "%.1f", elapsed)} s.",
+                            actionAdvice = "City stop benchmark logged.",
+                            severity = com.example.model.AlertSeverity.INFO
+                        )
+                    )
+                }
+            }
+        }
+
+        // Max Power Benchmark
+        if (d.rpm > 5200.0 && d.throttlePos > 85.0 && now - lastMaxPowerAlertTime > 45000L) {
+            lastMaxPowerAlertTime = now
+            if (_voiceAlertsEnabled.value && notif.maxPowerVocalMessage) {
+                ttsManager.speak("Peak engine power reached.")
+            }
+            if (_visualAlertsEnabled.value && notif.generateMaxPowerMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-max-power",
+                        title = "PEAK POWER REACHED",
+                        message = "Maximum engine power envelope accessed at ${d.rpm.toInt()} RPM.",
+                        actionAdvice = "Engine operating near peak horsepower output.",
+                        severity = com.example.model.AlertSeverity.INFO
+                    )
+                )
+            }
+        }
+
+        // Max Torque Benchmark
+        if (d.rpm in 2200.0..3600.0 && d.throttlePos > 80.0 && now - lastMaxTorqueAlertTime > 45000L) {
+            lastMaxTorqueAlertTime = now
+            if (_visualAlertsEnabled.value && notif.generateMaxTorqueMessage) {
+                showAlertWithTimeout(
+                    com.example.model.ActiveAlert(
+                        id = "alert-max-torque",
+                        title = "PEAK TORQUE REACHED",
+                        message = "Peak engine torque sweet-spot achieved (${d.rpm.toInt()} RPM).",
+                        actionAdvice = "Maximum pulling power available.",
+                        severity = com.example.model.AlertSeverity.INFO
+                    )
+                )
+            }
         }
     }
 
@@ -746,6 +1392,124 @@ class SharedTelemetryViewModel(
 
     fun setNotificationSettings(settings: com.example.model.NotificationSettings) {
         _notificationSettings.value = settings
+    }
+
+    fun activateAllVisualAlerts() {
+        _visualAlertsEnabled.value = true
+        _notificationSettings.value = _notificationSettings.value.copy(
+            generateStartTripMessage = true,
+            generateEndTripMessage = true,
+            generateConsumptionMessage = true,
+            generateStyleDrivingMessage = true,
+            generateLackOfAutonomyAlert = true,
+            generateDrivingDurationAlert = true,
+            generateHighRpmAlert = true,
+            generateCoolantOverheatAlert = true,
+            generateAnomalyAlert = true,
+            generateEngineOperatingTempMessage = true,
+            generateLowEngineTempMessage = true,
+            generateOverspeedingAlert = true,
+            generateMaxPowerMessage = true,
+            generateMaxTorqueMessage = true,
+            generateAccel0To50Message = true,
+            generateAccel0To100Message = true,
+            generatePickup40To70Message = true,
+            generatePickup60To100Message = true,
+            generatePickup80To120Message = true,
+            generatePickup90To130Message = true,
+            generateBraking100To0Message = true,
+            generateBraking50To0Message = true,
+            generateVehicleRangeAlert = true
+        )
+    }
+
+    fun deactivateAllVisualAlerts() {
+        _visualAlertsEnabled.value = false
+        _notificationSettings.value = _notificationSettings.value.copy(
+            generateStartTripMessage = false,
+            generateEndTripMessage = false,
+            generateConsumptionMessage = false,
+            generateStyleDrivingMessage = false,
+            generateLackOfAutonomyAlert = false,
+            generateDrivingDurationAlert = false,
+            generateHighRpmAlert = false,
+            generateCoolantOverheatAlert = false,
+            generateAnomalyAlert = false,
+            generateEngineOperatingTempMessage = false,
+            generateLowEngineTempMessage = false,
+            generateOverspeedingAlert = false,
+            generateMaxPowerMessage = false,
+            generateMaxTorqueMessage = false,
+            generateAccel0To50Message = false,
+            generateAccel0To100Message = false,
+            generatePickup40To70Message = false,
+            generatePickup60To100Message = false,
+            generatePickup80To120Message = false,
+            generatePickup90To130Message = false,
+            generateBraking100To0Message = false,
+            generateBraking50To0Message = false,
+            generateVehicleRangeAlert = false
+        )
+        _activeAlert.value = null
+    }
+
+    fun activateAllVocalAlerts() {
+        _voiceAlertsEnabled.value = true
+        _notificationSettings.value = _notificationSettings.value.copy(
+            startTripVocalMessage = true,
+            endTripVocalMessage = true,
+            consumptionVocalMessage = true,
+            styleDrivingVocalMessage = true,
+            lackOfAutonomyVocalAlert = true,
+            vehicleRangeVocalAlert = true,
+            drivingDurationVocalAlert = true,
+            engineOperatingTempVocalMessage = true,
+            lowEngineTempVocalAlert = true,
+            overspeedingVocalAlert = true,
+            highRpmVocalAlert = true,
+            coolantOverheatVocalAlert = true,
+            anomalyVocalAlert = true,
+            acceleration0To100VocalMessage = true,
+            accel0To50VocalMessage = true,
+            pickup40To70VocalMessage = true,
+            pickup60To100VocalMessage = true,
+            pickup80To120VocalMessage = true,
+            pickup90To130VocalMessage = true,
+            brakingVocalAlert = true,
+            maxPowerVocalMessage = true
+        )
+    }
+
+    fun deactivateAllVocalAlerts() {
+        _voiceAlertsEnabled.value = false
+        _notificationSettings.value = _notificationSettings.value.copy(
+            startTripVocalMessage = false,
+            endTripVocalMessage = false,
+            consumptionVocalMessage = false,
+            styleDrivingVocalMessage = false,
+            lackOfAutonomyVocalAlert = false,
+            drivingDurationVocalAlert = false,
+            engineOperatingTempVocalMessage = false,
+            lowEngineTempVocalAlert = false,
+            overspeedingVocalAlert = false,
+            highRpmVocalAlert = false,
+            coolantOverheatVocalAlert = false,
+            anomalyVocalAlert = false,
+            acceleration0To100VocalMessage = false,
+            accel0To50VocalMessage = false,
+            pickup40To70VocalMessage = false,
+            pickup60To100VocalMessage = false,
+            pickup80To120VocalMessage = false,
+            pickup90To130VocalMessage = false,
+            brakingVocalAlert = false,
+            maxPowerVocalMessage = false
+        )
+    }
+
+    fun testVoiceAlert(sampleText: String = "Warning: Aggressive driving behaviour detected. Ease throttle pedal.") {
+        if (_voiceAlertsEnabled.value) {
+            ttsManager.speak(sampleText)
+        }
     }
 
     fun toggleVoiceAlerts(enabled: Boolean) {
@@ -1109,17 +1873,19 @@ class SharedTelemetryViewModel(
         if (result.isSuccess && result.getOrNull() != null) {
             val response = result.getOrNull()
             _driverBehaviour.value = response
-            response?.ttsMessage?.let { msg ->
-                val now = System.currentTimeMillis()
-                if (_voiceAlertsEnabled.value && now - lastBehaviourTtsTime > 25000) {
-                    ttsManager.speak(msg)
-                    lastBehaviourTtsTime = now
-                }
+            val isAggressive = response?.label?.contains("aggressive", ignoreCase = true) == true ||
+                    response?.behaviourClass?.contains("aggressive", ignoreCase = true) == true
+            if (isAggressive) {
+                handleAggressiveDrivingAlert(response?.ttsMessage)
             }
         } else {
             // Local Classifier Fallback
             val fallbackResponse = generateFallbackBehaviour(fallbackTick)
             _driverBehaviour.value = fallbackResponse
+            val isAggressive = fallbackResponse.label.contains("aggressive", ignoreCase = true)
+            if (isAggressive) {
+                handleAggressiveDrivingAlert(fallbackResponse.ttsMessage)
+            }
         }
     }
 

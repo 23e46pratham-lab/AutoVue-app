@@ -95,11 +95,15 @@ fun DashboardScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
-    onNavigateToOnboarding: () -> Unit = {}
+    onNavigateToOnboarding: () -> Unit = {},
+    onNavigateToRefueling: () -> Unit = {}
 ) {
     val tick by viewModel.latestTick.collectAsState()
     val status by viewModel.connectionStatus.collectAsState()
     val profile by viewModel.vehicleProfile.collectAsState()
+    val currentFuelPercent by viewModel.currentFuelPercent.collectAsState()
+    val avgEconomyL100km by viewModel.averageFuelEconomyL100km.collectAsState()
+    val fuelCurrency by viewModel.fuelCurrency.collectAsState()
     val tripMinutes by viewModel.tripElapsedTimeMinutes.collectAsState()
     val tripDist by viewModel.tripDistanceKm.collectAsState()
     val tripCost by viewModel.tripCostEuro.collectAsState()
@@ -111,7 +115,6 @@ fun DashboardScreen(
     val isAnalyzing by viewModel.isAnalyzing.collectAsState()
 
     var showProfileDialog by remember { mutableStateOf(false) }
-    var showRefuelingDialog by remember { mutableStateOf(false) }
     var showGuideDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showObdDialog by remember { mutableStateOf(false) }
@@ -245,7 +248,7 @@ fun DashboardScreen(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
                         onSelectQuickGuide = { showGuideDialog = true },
-                        onSelectRefueling = { showRefuelingDialog = true },
+                        onSelectRefueling = onNavigateToRefueling,
                         onSelectSettings = onNavigateToSettings,
                         onSelectDtc = onNavigateToDtc,
                         onSelectLiveData = onNavigateToLiveData,
@@ -271,6 +274,8 @@ fun DashboardScreen(
             elapsedMinutes = tripMinutes,
             distanceKm = tripDist,
             costEuro = tripCost,
+            avgConsumptionL100km = avgEconomyL100km,
+            currencySymbol = fuelCurrency,
             voiceEnabled = voiceEnabled,
             alertsEnabled = alertsEnabled,
             onProfileClick = { showProfileDialog = true },
@@ -281,7 +286,7 @@ fun DashboardScreen(
         // Centerpiece: Cockpit Analog Tachometer & Peripheral Gauges (Screenshot 1)
         CockpitInstrumentCluster(
             data = currentData,
-            fuelPercent = profile.fuelLeftPercent,
+            fuelPercent = currentFuelPercent,
             peakPowerHp = profile.maxPowerHp.takeIf { it > 0 } ?: 41.0,
             peakPowerRpm = 1629,
             peakTorqueNm = 187.0,
@@ -320,7 +325,7 @@ fun DashboardScreen(
             }
 
             Button(
-                onClick = { showRefuelingDialog = true },
+                onClick = onNavigateToRefueling,
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
                 border = androidx.compose.foundation.BorderStroke(0.75.dp, CockpitSurfaceBorder),
@@ -425,15 +430,6 @@ fun DashboardScreen(
             currentProfile = profile,
             onDismiss = { showProfileDialog = false },
             onSave = { updated -> viewModel.updateVehicleProfile(updated) }
-        )
-    }
-
-    if (showRefuelingDialog) {
-        RefuelingDialog(
-            profileName = profile.profileName,
-            currentOdometer = profile.odometerKm,
-            onDismiss = { showRefuelingDialog = false },
-            onSave = { entry -> viewModel.addRefuelingEntry(entry) }
         )
     }
 

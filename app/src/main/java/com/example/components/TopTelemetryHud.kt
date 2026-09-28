@@ -53,6 +53,8 @@ fun TopTelemetryHud(
     elapsedMinutes: Int = 8,
     distanceKm: Double = 0.0,
     costEuro: Double = 0.0,
+    avgConsumptionL100km: Double = 0.0,
+    currencySymbol: String = "€",
     voiceEnabled: Boolean = true,
     alertsEnabled: Boolean = true,
     onProfileClick: () -> Unit = {},
@@ -69,9 +71,13 @@ fun TopTelemetryHud(
         "--.- l/100km"
     }
 
-    val avgConsumptionStr = "--.- l/100km"
+    val avgConsumptionStr = if (avgConsumptionL100km > 0.1) {
+        String.format(Locale.US, "%.1f l/100km", avgConsumptionL100km)
+    } else {
+        "--.- l/100km"
+    }
     val driveScoreStr = if (speed > 0) "88.5 %" else "--.- %"
-    val costStr = if (costEuro > 0.01) String.format(Locale.US, "%.2f €", costEuro) else "--.- €"
+    val costStr = if (costEuro > 0.001) String.format(Locale.US, "%.2f %s", costEuro, currencySymbol) else "--.- $currencySymbol"
 
     Box(
         modifier = modifier

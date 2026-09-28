@@ -10,4 +10,5 @@ sealed class Screen(val route: String) {
     data object TripMap : Screen("trip_map")
     data object Insights : Screen("insights")
     data object Settings : Screen("settings")
+    data object Refueling : Screen("refueling")
 }

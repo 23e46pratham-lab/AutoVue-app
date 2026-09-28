@@ -45,6 +45,7 @@ import com.example.ui.DashboardScreen
 import com.example.ui.DtcScannerScreen
 import com.example.ui.InsightsScreen
 import com.example.ui.LiveTelemetryScreen
+import com.example.ui.RefuelingScreen
 import com.example.ui.SettingsScreen
 import com.example.ui.StartStopScreen
 import com.example.ui.TripMapScreen
@@ -155,7 +156,8 @@ fun AutoVueNavGraph(viewModel: SharedTelemetryViewModel) {
                     onNavigateToHistory = { navController.navigate(Screen.VehicleStatus.route) },
                     onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                     onNavigateToInsights = { navController.navigate(Screen.Insights.route) },
-                    onNavigateToOnboarding = { navController.navigate(Screen.Onboarding.route) }
+                    onNavigateToOnboarding = { navController.navigate(Screen.Onboarding.route) },
+                    onNavigateToRefueling = { navController.navigate(Screen.Refueling.route) }
                 )
             }
             composable(Screen.LiveData.route) {
@@ -168,13 +170,20 @@ fun AutoVueNavGraph(viewModel: SharedTelemetryViewModel) {
                 StartStopScreen(
                     viewModel = viewModel,
                     onOpenProfile = { navController.navigate(Screen.VehicleStatus.route) },
-                    onOpenRefueling = { navController.navigate(Screen.VehicleStatus.route) }
+                    onOpenRefueling = { navController.navigate(Screen.Refueling.route) }
                 )
             }
             composable(Screen.VehicleStatus.route) {
                 VehicleStatusScreen(
                     viewModel = viewModel,
-                    onOpenProfile = { navController.navigate(Screen.Settings.route) }
+                    onOpenProfile = { navController.navigate(Screen.Settings.route) },
+                    onNavigateToRefueling = { navController.navigate(Screen.Refueling.route) }
+                )
+            }
+            composable(Screen.Refueling.route) {
+                RefuelingScreen(
+                    viewModel = viewModel,
+                    onBackClick = { navController.popBackStack() }
                 )
             }
             composable(Screen.DtcScanner.route) {

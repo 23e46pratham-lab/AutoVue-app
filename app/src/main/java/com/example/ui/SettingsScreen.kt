@@ -25,11 +25,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -37,10 +40,14 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -250,8 +257,22 @@ fun SettingsScreen(
 
             when (activeTab) {
                 SettingsSubTab.NOTIFICATIONS -> {
-                    // ====== NOTIFICATION SETTINGS (Screenshots 1, 2, 5, 6) ======
-                    // Section: General & Trip Notifications
+                    // ====== NOTIFICATION SETTINGS ======
+                    // Master Visual Alerts Switch & Quick Actions
+                    AlertsMasterControlCard(
+                        title = "Visual Alerts Engine",
+                        subtitle = "Display popups, banners, and warnings on dashboard",
+                        isEnabled = visualAlertsEnabled,
+                        onToggle = { viewModel.toggleVisualAlerts(it) },
+                        onActivateAll = { viewModel.activateAllVisualAlerts() },
+                        onDeactivateAll = { viewModel.deactivateAllVisualAlerts() },
+                        testButtonText = "Test Banner",
+                        onTestClick = { viewModel.triggerTestAlert() }
+                    )
+
+                    // Section 1: Trip & Navigation Alerts
+                    SettingsSectionHeader("TRIP & NAVIGATION ALERTS", Icons.Default.DirectionsCar)
+
                     SettingsCheckboxCard(
                         title = "Generate start trip message",
                         checked = notifSettings.generateStartTripMessage,
@@ -269,7 +290,7 @@ fun SettingsScreen(
                     )
 
                     SettingsCheckboxCard(
-                        title = "Generate consumption message",
+                        title = "Generate high consumption message",
                         checked = notifSettings.generateConsumptionMessage,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(generateConsumptionMessage = chk) }
@@ -277,7 +298,8 @@ fun SettingsScreen(
                     )
 
                     SettingsCheckboxCard(
-                        title = "Generate Style driving message",
+                        title = "Aggressive driving alert",
+                        subtitle = "Triggers alert banner ONLY when driving behaviour is aggressive",
                         checked = notifSettings.generateStyleDrivingMessage,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(generateStyleDrivingMessage = chk) }
@@ -286,13 +308,25 @@ fun SettingsScreen(
 
                     SettingsCheckboxCard(
                         title = "Generate lack of autonomy alert",
+                        subtitle = "Warns when remaining fuel range drops below 50 km",
                         checked = notifSettings.generateLackOfAutonomyAlert,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(generateLackOfAutonomyAlert = chk) }
                         }
                     )
 
-                    // Section: Engine Operating Temperature (Screenshot 6)
+                    SettingsCheckboxCard(
+                        title = "Generate driving duration reminder alert",
+                        subtitle = "Warns driver when continuous driving time exceeds limit",
+                        checked = notifSettings.generateDrivingDurationAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(generateDrivingDurationAlert = chk) }
+                        }
+                    )
+
+                    // Section 2: Engine Status & Safety Protection Alerts
+                    SettingsSectionHeader("ENGINE STATUS & CRITICAL SAFETY ALERTS", Icons.Default.Shield)
+
                     SettingsCheckboxCard(
                         title = "Generate 'Engine operating temperature' message",
                         checked = notifSettings.generateEngineOperatingTempMessage,
@@ -310,7 +344,6 @@ fun SettingsScreen(
                         }
                     )
 
-                    // Section: Low Engine Temperature (Screenshot 6)
                     SettingsCheckboxCard(
                         title = "Generate 'Low engine temperature' message",
                         checked = notifSettings.generateLowEngineTempMessage,
@@ -328,7 +361,36 @@ fun SettingsScreen(
                         }
                     )
 
-                    // Section: Limiters & Sliders (Screenshot 5)
+                    SettingsCheckboxCard(
+                        title = "Generate engine coolant overheat warning",
+                        subtitle = "Critical alert when coolant exceeds 100°C",
+                        checked = notifSettings.generateCoolantOverheatAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(generateCoolantOverheatAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Generate high engine RPM warning",
+                        subtitle = "Warns when engine speed approaches redline (>6000 RPM)",
+                        checked = notifSettings.generateHighRpmAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(generateHighRpmAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Generate vehicle health anomaly alert",
+                        subtitle = "Flags powertrain sensor outliers via LSTM Autoencoder",
+                        checked = notifSettings.generateAnomalyAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(generateAnomalyAlert = chk) }
+                        }
+                    )
+
+                    // Section 3: Limits & Sliders
+                    SettingsSectionHeader("LIMITERS & TIMEOUTS", Icons.Default.Speed)
+
                     SettingsStepperSliderCard(
                         title = "Time out display message (sec)",
                         value = notifSettings.timeOutDisplayMessageSec,
@@ -343,7 +405,7 @@ fun SettingsScreen(
                     SettingsStepperSliderCard(
                         title = "Overspeeding message over (km/h)",
                         value = notifSettings.overspeedingMessageOverKmh,
-                        range = 60f..200f,
+                        range = 50f..220f,
                         step = 5,
                         unit = "km/h",
                         onValueChange = { valKmh ->
@@ -352,7 +414,7 @@ fun SettingsScreen(
                     )
 
                     SettingsTextWarningCard(
-                        title = "Overspeeding alert",
+                        title = "Overspeeding alert warning text",
                         text = notifSettings.overspeedingAlertText,
                         defaultText = "Slow down. You are always the usual speeder",
                         onTextChange = { txt ->
@@ -382,9 +444,33 @@ fun SettingsScreen(
                         }
                     )
 
-                    // Section: Performance & Benchmarks (Screenshots 1 & 2)
+                    SettingsStepperSliderCard(
+                        title = "Fuel range autonomy warning threshold (km)",
+                        value = notifSettings.fuelRangeAutonomyThresholdKm,
+                        range = 20f..150f,
+                        step = 5,
+                        unit = "km",
+                        onValueChange = { valKm ->
+                            viewModel.updateNotificationSettings { it.copy(fuelRangeAutonomyThresholdKm = valKm) }
+                        }
+                    )
+
+                    SettingsStepperSliderCard(
+                        title = "Low fuel reserve warning threshold (%)",
+                        value = notifSettings.lowFuelWarningThresholdPercent,
+                        range = 5f..35f,
+                        step = 1,
+                        unit = "%",
+                        onValueChange = { valPct ->
+                            viewModel.updateNotificationSettings { it.copy(lowFuelWarningThresholdPercent = valPct) }
+                        }
+                    )
+
+                    // Section 4: Performance & Benchmarks
+                    SettingsSectionHeader("PERFORMANCE & DYNAMICS BENCHMARKS", Icons.Default.Whatshot)
+
                     SettingsCheckboxCard(
-                        title = "Generate overspeeding alert.",
+                        title = "Generate overspeeding alert",
                         checked = notifSettings.generateOverspeedingAlert,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(generateOverspeedingAlert = chk) }
@@ -475,43 +561,69 @@ fun SettingsScreen(
                 }
 
                 SettingsSubTab.VOCAL -> {
-                    // ====== VOCAL / SPEECH NOTIFICATIONS (Screenshots 3 & 4) ======
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = CockpitCard),
-                        border = BorderStroke(1.dp, CockpitSurfaceBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Text-to-Speech Voice Engine",
-                                    color = TextPrimary,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Speak critical safety & telemetry alerts through vehicle audio",
-                                    color = TextMuted,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            Switch(
-                                checked = voiceAlertsEnabled,
-                                onCheckedChange = { viewModel.toggleVoiceAlerts(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = CockpitSteel,
-                                    checkedTrackColor = CockpitSteel.copy(alpha = 0.4f)
-                                )
-                            )
+                    // ====== VOCAL / SPEECH NOTIFICATIONS ======
+                    // Master Voice Alerts Switch & Quick Actions
+                    AlertsMasterControlCard(
+                        title = "Text-to-Speech Voice Engine",
+                        subtitle = "Speak safety & telemetry alerts through audio",
+                        isEnabled = voiceAlertsEnabled,
+                        onToggle = { viewModel.toggleVoiceAlerts(it) },
+                        onActivateAll = { viewModel.activateAllVocalAlerts() },
+                        onDeactivateAll = { viewModel.deactivateAllVocalAlerts() },
+                        testButtonText = "Test Voice",
+                        onTestClick = { viewModel.testVoiceAlert() }
+                    )
+
+                    // Section 1: Driving Style & Critical Safety Voice Warnings
+                    SettingsSectionHeader("DRIVING STYLE & SAFETY VOICE ALERTS", Icons.Default.Warning)
+
+                    SettingsCheckboxCard(
+                        title = "Aggressive driving vocal warning",
+                        subtitle = "Speaks warning ONLY when driving is aggressive. 'Great driving' / Eco / Normal alerts are completely muted.",
+                        checked = notifSettings.styleDrivingVocalMessage,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(styleDrivingVocalMessage = chk) }
                         }
-                    }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Overspeeding vocal alert",
+                        subtitle = "Voice warning when speed exceeds configured limit",
+                        checked = notifSettings.overspeedingVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(overspeedingVocalAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "High engine RPM vocal warning",
+                        subtitle = "Spoken warning when RPM exceeds redline threshold (>6000 RPM)",
+                        checked = notifSettings.highRpmVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(highRpmVocalAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Coolant overheat critical vocal alert",
+                        subtitle = "Spoken emergency prompt when coolant temperature exceeds 100°C",
+                        checked = notifSettings.coolantOverheatVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(coolantOverheatVocalAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Vehicle health anomaly vocal alert",
+                        subtitle = "Spoken alert when autoencoder detects abnormal sensor behaviour",
+                        checked = notifSettings.anomalyVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(anomalyVocalAlert = chk) }
+                        }
+                    )
+
+                    // Section 2: Trip & Autonomy Voice Messages
+                    SettingsSectionHeader("TRIP & AUTONOMY VOCAL MESSAGES", Icons.Default.DirectionsCar)
 
                     SettingsCheckboxCard(
                         title = "Start trip vocal message",
@@ -530,7 +642,7 @@ fun SettingsScreen(
                     )
 
                     SettingsCheckboxCard(
-                        title = "Consumption vocal message",
+                        title = "High consumption vocal message",
                         checked = notifSettings.consumptionVocalMessage,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(consumptionVocalMessage = chk) }
@@ -538,20 +650,34 @@ fun SettingsScreen(
                     )
 
                     SettingsCheckboxCard(
-                        title = "Style driving vocal message",
-                        checked = notifSettings.styleDrivingVocalMessage,
-                        onCheckedChange = { chk ->
-                            viewModel.updateNotificationSettings { it.copy(styleDrivingVocalMessage = chk) }
-                        }
-                    )
-
-                    SettingsCheckboxCard(
                         title = "Lack of autonomy vocal alert",
+                        subtitle = "Speaks remaining range when fuel level is low",
                         checked = notifSettings.lackOfAutonomyVocalAlert,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(lackOfAutonomyVocalAlert = chk) }
                         }
                     )
+
+                    SettingsCheckboxCard(
+                        title = "Vehicle range & fuel autonomy voice announcement",
+                        subtitle = "Detailed voice readout of estimated remaining range, fuel litres, percentage, and burn rate",
+                        checked = notifSettings.vehicleRangeVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(vehicleRangeVocalAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Driving duration rest reminder vocal alert",
+                        subtitle = "Spoken fatigue reminder after sustained driving",
+                        checked = notifSettings.drivingDurationVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(drivingDurationVocalAlert = chk) }
+                        }
+                    )
+
+                    // Section 3: Engine Status Voice Messages
+                    SettingsSectionHeader("ENGINE STATUS VOCAL MESSAGES", Icons.Default.Shield)
 
                     SettingsCheckboxCard(
                         title = "Read 'Engine operating temperature' message",
@@ -562,10 +688,30 @@ fun SettingsScreen(
                     )
 
                     SettingsCheckboxCard(
+                        title = "Low engine temperature vocal alert",
+                        subtitle = "Warns against high RPM when engine is still cold (<60°C)",
+                        checked = notifSettings.lowEngineTempVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(lowEngineTempVocalAlert = chk) }
+                        }
+                    )
+
+                    // Section 4: Performance & Benchmarking Announcements
+                    SettingsSectionHeader("PERFORMANCE BENCHMARK ANNOUNCEMENTS", Icons.Default.Whatshot)
+
+                    SettingsCheckboxCard(
                         title = "Acceleration 0-100 km/h vocal message",
                         checked = notifSettings.acceleration0To100VocalMessage,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(acceleration0To100VocalMessage = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Acceleration 0-50 km/h vocal message",
+                        checked = notifSettings.accel0To50VocalMessage,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(accel0To50VocalMessage = chk) }
                         }
                     )
 
@@ -590,6 +736,32 @@ fun SettingsScreen(
                         checked = notifSettings.pickup80To120VocalMessage,
                         onCheckedChange = { chk ->
                             viewModel.updateNotificationSettings { it.copy(pickup80To120VocalMessage = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Pickup 90-130 km/h vocal message",
+                        checked = notifSettings.pickup90To130VocalMessage,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(pickup90To130VocalMessage = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Braking benchmark vocal message",
+                        subtitle = "Spoken deceleration time when stopping from 100 km/h",
+                        checked = notifSettings.brakingVocalAlert,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(brakingVocalAlert = chk) }
+                        }
+                    )
+
+                    SettingsCheckboxCard(
+                        title = "Peak engine power vocal message",
+                        subtitle = "Spoken notification when accessing peak horsepower envelope",
+                        checked = notifSettings.maxPowerVocalMessage,
+                        onCheckedChange = { chk ->
+                            viewModel.updateNotificationSettings { it.copy(maxPowerVocalMessage = chk) }
                         }
                     )
 
@@ -1255,11 +1427,136 @@ private fun SettingsAnomalyItemCard(
 // ====== REUSABLE SETTINGS COMPONENTS ======
 
 @Composable
+fun SettingsSectionHeader(title: String, icon: ImageVector? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp)
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = AtherMint,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Text(
+            text = title,
+            color = AtherMint,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.5.sp
+        )
+    }
+}
+
+@Composable
+fun AlertsMasterControlCard(
+    title: String,
+    subtitle: String,
+    isEnabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onActivateAll: () -> Unit,
+    onDeactivateAll: () -> Unit,
+    testButtonText: String,
+    onTestClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = CockpitCard),
+        border = BorderStroke(1.dp, if (isEnabled) AtherMint.copy(alpha = 0.5f) else CockpitSurfaceBorder)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = subtitle,
+                        color = TextMuted,
+                        fontSize = 11.sp
+                    )
+                }
+                Switch(
+                    checked = isEnabled,
+                    onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = AtherMint,
+                        checkedTrackColor = AtherMint.copy(alpha = 0.4f),
+                        uncheckedThumbColor = CockpitSteel,
+                        uncheckedTrackColor = CockpitSurfaceBorder
+                    )
+                )
+            }
+
+            // Bulk Action & Test Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onActivateAll,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CockpitGreen.copy(alpha = 0.2f)),
+                    border = BorderStroke(1.dp, CockpitGreen.copy(alpha = 0.5f)),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = CockpitGreen, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Activate All", color = CockpitGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onDeactivateAll,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CockpitRed.copy(alpha = 0.15f)),
+                    border = BorderStroke(1.dp, CockpitRed.copy(alpha = 0.5f)),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = null, tint = CockpitRed, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Deactivate All", color = CockpitRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onTestClick,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = CockpitCardElevated),
+                    border = BorderStroke(1.dp, CockpitSurfaceBorder),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Text(testButtonText, color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SettingsCheckboxCard(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subtitle: String? = null
 ) {
     Card(
         modifier = modifier
@@ -1285,14 +1582,23 @@ fun SettingsCheckboxCard(
                     uncheckedColor = TextMuted
                 )
             )
-            Text(
-                text = title,
-                color = TextPrimary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                lineHeight = 18.sp,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = TextPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 18.sp
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        color = TextMuted,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
         }
     }
 }

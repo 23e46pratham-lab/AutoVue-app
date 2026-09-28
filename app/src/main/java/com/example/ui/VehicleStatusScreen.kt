@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.TelemetryData
 import com.example.model.TripHistoryItem
+import com.example.ui.theme.AtherMint
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
@@ -94,10 +95,13 @@ import java.util.Locale
 fun VehicleStatusScreen(
     viewModel: SharedTelemetryViewModel,
     onOpenProfile: () -> Unit = {},
-    onOpenOverflowMenu: () -> Unit = {}
+    onOpenOverflowMenu: () -> Unit = {},
+    onNavigateToRefueling: () -> Unit = {}
 ) {
     val tick by viewModel.latestTick.collectAsState()
     val profile by viewModel.vehicleProfile.collectAsState()
+    val currentFuelPercent by viewModel.currentFuelPercent.collectAsState()
+    val estimatedRangeKm by viewModel.estimatedRangeKm.collectAsState()
     val trips by viewModel.tripHistory.collectAsState()
 
     // Active selected trip for inline detail view & contextual embedded map
@@ -341,10 +345,14 @@ fun VehicleStatusScreen(
                         }
                     }
 
-                    // Vertical Translucent Fuel Gauge
+                    // Vertical Translucent Fuel Gauge (Clickable to open Refueling)
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(84.dp)
+                        modifier = Modifier
+                            .width(84.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onNavigateToRefueling() }
+                            .padding(vertical = 2.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -356,7 +364,7 @@ fun VehicleStatusScreen(
                                 .padding(2.dp),
                             contentAlignment = Alignment.BottomCenter
                         ) {
-                            val fuelFrac = (profile.fuelLeftPercent.toFloat() / 100f).coerceIn(0f, 1f)
+                            val fuelFrac = (currentFuelPercent.toFloat() / 100f).coerceIn(0f, 1f)
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -379,16 +387,17 @@ fun VehicleStatusScreen(
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "${profile.fuelLeftPercent.toInt()}%",
+                                text = "${currentFuelPercent.toInt()}%",
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
-                            text = "Auth. 145 km",
-                            color = TextMuted,
-                            fontSize = 10.sp
+                            text = "Auth. ${estimatedRangeKm.toInt()} km",
+                            color = AtherMint,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
