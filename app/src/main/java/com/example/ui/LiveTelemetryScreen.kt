@@ -20,9 +20,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Timeline
@@ -68,12 +71,12 @@ import java.util.Locale
 /**
  * Live Telemetry Tab:
  * Multi-Channel Diagnostic Strip Chart Recorder
- * Designed after high-end professional automotive digital storage oscilloscopes (DSO).
+ * Modeled after professional automotive digital storage oscilloscopes (DSO).
  *
  * Displays live, rolling multi-channel waveforms for:
- * 1. RPM vs Vehicle Speed correlation.
- * 2. Throttle position vs Intake Manifold Pressure response.
- * 3. Coolant Temperature warm-up curve.
+ * 1. RPM vs Vehicle Speed correlation (Powertrain lockup).
+ * 2. Throttle Position vs Intake Manifold Pressure response (Induction transients).
+ * 3. Coolant Temperature warm-up curve vs Intake Air Temp (Thermal regulation).
  */
 @Composable
 fun LiveTelemetryScreen(
@@ -87,6 +90,7 @@ fun LiveTelemetryScreen(
     var isPaused by remember { mutableStateOf(false) }
     var frozenHistory by remember { mutableStateOf<List<TelemetryTick>>(emptyList()) }
     var windowSeconds by remember { mutableIntStateOf(30) }
+    var triggerMode by remember { mutableStateOf("AUTO") }
 
     val currentData = tick?.data ?: TelemetryData(
         coolantTemp = 88.0,
@@ -99,11 +103,11 @@ fun LiveTelemetryScreen(
         ambientTemp = 22.0
     )
 
-    // When paused, hold the frozen snapshot; otherwise take the live stream window
+    // When paused, hold the frozen snapshot; otherwise stream live history
     val activeHistory = if (isPaused) {
-        if (frozenHistory.isNotEmpty()) frozenHistory.takeLast(windowSeconds) else history.takeLast(windowSeconds)
+        if (frozenHistory.isNotEmpty()) frozenHistory else history
     } else {
-        history.takeLast(windowSeconds)
+        history
     }
 
     // 1. Channel 1 & 2: RPM vs Vehicle Speed Correlation
@@ -184,7 +188,7 @@ fun LiveTelemetryScreen(
                     .fillMaxWidth()
                     .padding(14.dp)
             ) {
-                // Top Badge & Live Status
+                // Top Status & Protocol Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,12 +200,12 @@ fun LiveTelemetryScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(9.dp)
                                 .clip(CircleShape)
                                 .background(if (isPaused) CockpitAmber else CockpitGreen)
                         )
                         Text(
-                            text = if (isPaused) "DSO HOLD • FROZEN" else "LIVE OBD-II DSO",
+                            text = if (isPaused) "DSO BUFFER FROZEN (HOLD)" else "LIVE OBD-II DSO STREAM",
                             color = if (isPaused) CockpitAmber else CockpitGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -246,77 +250,133 @@ fun LiveTelemetryScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // DSO Scope Controls: Run/Hold and Clean Time Window Selector
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                // ==============================================================
+                // Interactive Scope Controls: Freeze & Segmented Timebase Bar
+                // ==============================================================
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CockpitCardElevated)
+                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // RUN / HOLD (PAUSE) Button
-                    Button(
-                        onClick = {
-                            if (!isPaused) {
-                                frozenHistory = history
-                                isPaused = true
-                            } else {
-                                isPaused = false
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isPaused) CockpitAmber else CockpitSteel,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(38.dp)
+                    // Row 1: Run/Hold Main Toggle Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                contentDescription = if (isPaused) "Resume" else "Hold",
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isPaused) "RESUME LIVE" else "FREEZE DSO",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace
-                            )
+                        Button(
+                            onClick = {
+                                if (!isPaused) {
+                                    frozenHistory = history
+                                    isPaused = true
+                                } else {
+                                    isPaused = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isPaused) CockpitAmber else CockpitSteel,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(40.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                    contentDescription = if (isPaused) "Resume" else "Freeze",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (isPaused) "RESUME LIVE STREAM" else "FREEZE DSO BUFFER",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Trigger Mode Toggle
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CockpitCard)
+                                .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    triggerMode = if (triggerMode == "AUTO") "SINGLE" else "AUTO"
+                                }
+                                .padding(horizontal = 10.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Trigger Mode",
+                                    tint = CockpitSteel,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "TRIG: $triggerMode",
+                                    color = TextPrimary,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
-                    // Clean, properly aligned Time Window Selector (30s vs 60s)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Row 2: Precision Segmented Timebase Window Selector (10s, 30s, 60s, 120s)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "Window:",
+                            text = "TIMEBASE SWEEP WINDOW:",
                             color = TextSecondary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFamily = FontFamily.Monospace
                         )
-                        listOf(30, 60).forEach { sec ->
-                            val isSelected = windowSeconds == sec
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) CockpitSteel else CockpitCardElevated)
-                                    .border(
-                                        1.dp,
-                                        if (isSelected) CockpitSteel else CardBorder,
-                                        RoundedCornerShape(6.dp)
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(CockpitCard)
+                                .border(1.dp, CardBorder, RoundedCornerShape(6.dp))
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val timeOptions = listOf(10, 30, 60, 120)
+                            timeOptions.forEach { sec ->
+                                val isSelected = windowSeconds == sec
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(32.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (isSelected) CockpitSteel else Color.Transparent)
+                                        .clickable { windowSeconds = sec },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "${sec}s",
+                                        color = if (isSelected) Color.White else TextSecondary,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     )
-                                    .clickable { windowSeconds = sec }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                            ) {
-                                Text(
-                                    text = "${sec}s",
-                                    color = if (isSelected) Color.White else TextPrimary,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                )
+                                }
                             }
                         }
                     }
@@ -465,7 +525,7 @@ fun LiveTelemetryScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = "Waveforms are synchronized across a dual-channel ring buffer sampling at 10-50 Hz via the vehicle's OBD-II CAN bus. The digital storage oscilloscope engine performs on-device scale normalization, anti-aliased Bézier interpolation, and peak detection to provide dealer-grade diagnostic visibility without external lab scopes.",
+                    text = "Waveforms are synchronized across a dual-channel ring buffer sampling via the vehicle's OBD-II CAN bus. The digital storage oscilloscope engine performs on-device scale normalization, anti-aliased Bézier interpolation, and peak detection to provide dealer-grade diagnostic visibility without external lab scopes.",
                     color = TextSecondary,
                     fontSize = 10.sp,
                     lineHeight = 14.sp

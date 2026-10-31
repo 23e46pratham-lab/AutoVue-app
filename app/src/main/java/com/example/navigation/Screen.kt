@@ -1,6 +1,7 @@
 package com.example.navigation
 
 sealed class Screen(val route: String) {
+    data object Intro : Screen("intro")
     data object Onboarding : Screen("onboarding")
     data object Dashboard : Screen("dashboard")
     data object StartStop : Screen("start_stop")

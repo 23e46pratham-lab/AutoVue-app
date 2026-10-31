@@ -1,8 +1,10 @@
 package com.example.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -52,9 +56,9 @@ import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitCard
 import com.example.ui.theme.CockpitCardElevated
+import com.example.ui.theme.CockpitGreen
 import com.example.ui.theme.CockpitRed
 import com.example.ui.theme.CockpitSteel
-import com.example.ui.theme.CockpitSurfaceBorder
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
@@ -72,8 +76,9 @@ data class DsoZoneHighlight(
 
 /**
  * Multi-Channel Diagnostic Strip Chart Recorder Card
- * Designed after high-end professional automotive digital storage oscilloscopes (DSO).
- * Clean, consistent cockpit styling matching all other application tabs.
+ * Modeled after precision automotive digital storage oscilloscopes (DSO).
+ * Features true time-scaled zoom (10s, 30s, 60s, 120s), interactive channel toggles,
+ * frozen buffer indicator, calibrated dual-axis grids, and rich diagnostic inspection.
  */
 @Composable
 fun MultiChannelDsoCard(
@@ -112,8 +117,13 @@ fun MultiChannelDsoCard(
     var ch2Visible by remember { mutableStateOf(true) }
     var showInfoNote by remember { mutableStateOf(false) }
 
-    val cleanCh1 = if (channel1History.isEmpty()) listOf(0.0) else channel1History
-    val cleanCh2 = if (channel2History.isNullOrEmpty()) listOf(0.0) else channel2History
+    // Take points corresponding to the time window (windowSeconds)
+    // Points are sampled approximately 1 per second (or dynamic). We slice the last windowSeconds points.
+    val rawCh1Window = channel1History.takeLast(windowSeconds.coerceAtLeast(1))
+    val cleanCh1 = if (rawCh1Window.isEmpty()) listOf(0.0) else rawCh1Window
+
+    val rawCh2Window = channel2History?.takeLast(windowSeconds.coerceAtLeast(1))
+    val cleanCh2 = if (rawCh2Window.isNullOrEmpty()) listOf(0.0) else rawCh2Window
 
     val ch1MinVal = cleanCh1.minOrNull() ?: channel1Min
     val ch1MaxVal = cleanCh1.maxOrNull() ?: channel1Max
@@ -134,7 +144,9 @@ fun MultiChannelDsoCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
+            // ==============================================================
             // Header Row: Title, Subtitle, Info toggle
+            // ==============================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -146,7 +158,7 @@ fun MultiChannelDsoCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(CockpitCardElevated)
                             .border(1.dp, CardBorder, CircleShape),
@@ -179,20 +191,30 @@ fun MultiChannelDsoCard(
                     }
                 }
 
-                // Info toggle button
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = "Diagnostic Insight",
-                    tint = if (showInfoNote) CockpitAmber else TextMuted,
+                // Interactive Info / Diagnostic Insight toggle button (48dp touch target)
+                Box(
                     modifier = Modifier
-                        .size(20.dp)
-                        .clickable { showInfoNote = !showInfoNote }
-                )
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(if (showInfoNote) CockpitAmber.copy(alpha = 0.15f) else CockpitCardElevated)
+                        .border(1.dp, if (showInfoNote) CockpitAmber else CardBorder, CircleShape)
+                        .clickable { showInfoNote = !showInfoNote },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Diagnostic Insight",
+                        tint = if (showInfoNote) CockpitAmber else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Channel Badges and Correlation Stat Row
+            // ==============================================================
+            // Channel Badges and Correlation Stat Row (Fully Interactive)
+            // ==============================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -203,7 +225,7 @@ fun MultiChannelDsoCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    // Channel 1 Pill Badge
+                    // Channel 1 Pill Badge (Clickable Toggle with Active Feedback)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -214,18 +236,18 @@ fun MultiChannelDsoCard(
                                 RoundedCornerShape(6.dp)
                             )
                             .clickable { ch1Visible = !ch1Visible }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(if (ch1Visible) channel1Color else TextMuted)
+                            Icon(
+                                imageVector = if (ch1Visible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle CH1",
+                                tint = if (ch1Visible) channel1Color else TextMuted,
+                                modifier = Modifier.size(12.dp)
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "CH1: $channel1ValueText",
+                                text = if (ch1Visible) "CH1: $channel1ValueText" else "CH1: MUTED",
                                 color = if (ch1Visible) channel1Color else TextMuted,
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
@@ -235,30 +257,30 @@ fun MultiChannelDsoCard(
                         }
                     }
 
-                    // Channel 2 Pill Badge (if present)
+                    // Channel 2 Pill Badge (if present, Clickable Toggle)
                     if (channel2Name != null && channel2ValueText != null) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(if (ch2Visible) channel2Color.copy(alpha = 0.12f) else CockpitCardElevated)
-                                .border(
-                                    1.dp,
-                                    if (ch2Visible) channel2Color.copy(alpha = 0.7f) else CardBorder,
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .clickable { ch2Visible = !ch2Visible }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .border(
+                                1.dp,
+                                if (ch2Visible) channel2Color.copy(alpha = 0.7f) else CardBorder,
+                                RoundedCornerShape(6.dp)
+                            )
+                            .clickable { ch2Visible = !ch2Visible }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(if (ch2Visible) channel2Color else TextMuted)
+                                Icon(
+                                    imageVector = if (ch2Visible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = "Toggle CH2",
+                                    tint = if (ch2Visible) channel2Color else TextMuted,
+                                    modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(5.dp))
                                 Text(
-                                    text = "CH2: $channel2ValueText",
+                                    text = if (ch2Visible) "CH2: $channel2ValueText" else "CH2: MUTED",
                                     color = if (ch2Visible) channel2Color else TextMuted,
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,
@@ -308,18 +330,18 @@ fun MultiChannelDsoCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(148.dp)
+                    .height(152.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1B1D22))
-                    .border(1.dp, Color(0xFF2C3038), RoundedCornerShape(8.dp))
+                    .background(Color(0xFF16181D))
+                    .border(1.dp, Color(0xFF282C34), RoundedCornerShape(8.dp))
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
                     val h = size.height
-                    val paddingLeft = 34.dp.toPx()
-                    val paddingRight = if (channel2Name != null) 34.dp.toPx() else 8.dp.toPx()
+                    val paddingLeft = 36.dp.toPx()
+                    val paddingRight = if (channel2Name != null) 36.dp.toPx() else 10.dp.toPx()
                     val paddingTop = 8.dp.toPx()
-                    val paddingBottom = 16.dp.toPx()
+                    val paddingBottom = 18.dp.toPx()
 
                     val plotW = (w - paddingLeft - paddingRight).coerceAtLeast(10f)
                     val plotH = (h - paddingTop - paddingBottom).coerceAtLeast(10f)
@@ -335,7 +357,7 @@ fun MultiChannelDsoCard(
                         val zoneH = (bottomY - topY).coerceAtLeast(2f)
 
                         drawRect(
-                            color = zone.color.copy(alpha = 0.14f),
+                            color = zone.color.copy(alpha = 0.12f),
                             topLeft = Offset(paddingLeft, topY),
                             size = Size(plotW, zoneH)
                         )
@@ -346,7 +368,7 @@ fun MultiChannelDsoCard(
                     for (i in 0..hDivisions) {
                         val y = paddingTop + (plotH / hDivisions) * i
                         drawLine(
-                            color = Color(0xFF282C34),
+                            color = Color(0xFF242830),
                             start = Offset(paddingLeft, y),
                             end = Offset(paddingLeft + plotW, y),
                             strokeWidth = 1.dp.toPx(),
@@ -355,11 +377,11 @@ fun MultiChannelDsoCard(
                     }
 
                     // 3. Oscilloscope Grid Reticle (Vertical Timebase divisions)
-                    val vDivisions = 6
+                    val vDivisions = 4
                     for (i in 0..vDivisions) {
                         val x = paddingLeft + (plotW / vDivisions) * i
                         drawLine(
-                            color = Color(0xFF282C34),
+                            color = Color(0xFF242830),
                             start = Offset(x, paddingTop),
                             end = Offset(x, paddingTop + plotH),
                             strokeWidth = 1.dp.toPx(),
@@ -383,9 +405,16 @@ fun MultiChannelDsoCard(
                     }
 
                     // 5. Channel 1 Waveform (Primary)
-                    if (ch1Visible && cleanCh1.size > 1) {
+                    // Plotted from Left (-windowSeconds) to Right (0s / LIVE)
+                    if (ch1Visible && cleanCh1.isNotEmpty()) {
                         val effectiveMax1 = (channel1Max - channel1Min).coerceAtLeast(1.0)
-                        val stepX = plotW / (cleanCh1.size - 1).toFloat()
+                        val totalPoints = cleanCh1.size
+                        val stepX = if (totalPoints > 1) {
+                            plotW / (totalPoints - 1).toFloat()
+                        } else {
+                            plotW
+                        }
+
                         val path = Path()
                         val fillPath = Path()
 
@@ -405,7 +434,7 @@ fun MultiChannelDsoCard(
                             }
                         }
 
-                        fillPath.lineTo(paddingLeft + plotW, paddingTop + plotH)
+                        fillPath.lineTo(paddingLeft + (cleanCh1.size - 1) * stepX, paddingTop + plotH)
                         fillPath.close()
 
                         // Gradient fill under CH1
@@ -444,14 +473,20 @@ fun MultiChannelDsoCard(
                     }
 
                     // 6. Channel 2 Waveform (Secondary)
-                    if (channel2Name != null && ch2Visible && cleanCh2.size > 1) {
+                    if (channel2Name != null && ch2Visible && cleanCh2.isNotEmpty()) {
                         val effectiveMax2 = (channel2Max - channel2Min).coerceAtLeast(1.0)
-                        val stepX = plotW / (cleanCh2.size - 1).toFloat()
+                        val totalPoints2 = cleanCh2.size
+                        val stepX2 = if (totalPoints2 > 1) {
+                            plotW / (totalPoints2 - 1).toFloat()
+                        } else {
+                            plotW
+                        }
+
                         val path2 = Path()
 
                         for (i in cleanCh2.indices) {
                             val normY = ((cleanCh2[i] - channel2Min) / effectiveMax2).coerceIn(0.0, 1.0)
-                            val px = paddingLeft + (i * stepX)
+                            val px = paddingLeft + (i * stepX2)
                             val py = paddingTop + (1f - normY.toFloat()) * plotH
 
                             if (i == 0) {
@@ -471,7 +506,7 @@ fun MultiChannelDsoCard(
                         // Leading edge dot CH2
                         val lastIdx2 = cleanCh2.size - 1
                         val lastNorm2 = ((cleanCh2[lastIdx2] - channel2Min) / effectiveMax2).coerceIn(0.0, 1.0)
-                        val dotX2 = paddingLeft + (lastIdx2 * stepX)
+                        val dotX2 = paddingLeft + (lastIdx2 * stepX2)
                         val dotY2 = paddingTop + (1f - lastNorm2.toFloat()) * plotH
 
                         drawCircle(
@@ -487,30 +522,29 @@ fun MultiChannelDsoCard(
                     }
                 }
 
-                // CRT / Oscilloscope Scale Overlays
                 // Left Scale Labels (CH1)
                 Column(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 4.dp, top = 6.dp, bottom = 14.dp),
+                        .padding(start = 4.dp, top = 6.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
                         text = "${channel1Max.toInt()}",
-                        color = channel1Color,
+                        color = if (ch1Visible) channel1Color else TextMuted,
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${((channel1Max + channel1Min) / 2).toInt()}",
-                        color = channel1Color.copy(alpha = 0.7f),
+                        color = if (ch1Visible) channel1Color.copy(alpha = 0.7f) else TextMuted,
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "${channel1Min.toInt()}",
-                        color = channel1Color,
+                        color = if (ch1Visible) channel1Color else TextMuted,
                         fontSize = 8.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
@@ -522,26 +556,26 @@ fun MultiChannelDsoCard(
                     Column(
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(end = 4.dp, top = 6.dp, bottom = 14.dp),
+                            .padding(end = 4.dp, top = 6.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.SpaceBetween,
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(
                             text = "${channel2Max.toInt()}",
-                            color = channel2Color,
+                            color = if (ch2Visible) channel2Color else TextMuted,
                             fontSize = 8.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${((channel2Max + channel2Min) / 2).toInt()}",
-                            color = channel2Color.copy(alpha = 0.7f),
+                            color = if (ch2Visible) channel2Color.copy(alpha = 0.7f) else TextMuted,
                             fontSize = 8.sp,
                             fontFamily = FontFamily.Monospace
                         )
                         Text(
                             text = "${channel2Min.toInt()}",
-                            color = channel2Color,
+                            color = if (ch2Visible) channel2Color else TextMuted,
                             fontSize = 8.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold
@@ -555,7 +589,7 @@ fun MultiChannelDsoCard(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .padding(top = 4.dp)
-                            .background(Color(0xFF1B1D22).copy(alpha = 0.85f))
+                            .background(Color(0xFF16181D).copy(alpha = 0.85f))
                             .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
                         Text(
@@ -567,9 +601,10 @@ fun MultiChannelDsoCard(
                     }
                 }
 
-                // Timebase sweep markers along bottom (dynamically computed from windowSeconds)
-                val tThird = (windowSeconds / 3)
-                val tTwoThird = ((windowSeconds * 2) / 3)
+                // Dynamically computed Timebase Sweep Markers
+                val quarterTime = windowSeconds / 4
+                val halfTime = windowSeconds / 2
+                val threeQuarterTime = (windowSeconds * 3) / 4
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -578,9 +613,10 @@ fun MultiChannelDsoCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("-${windowSeconds}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Text("-${tTwoThird}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Text("-${tThird}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
-                    Text("LIVE", color = Color(0xFFE5E7EB), fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("-${threeQuarterTime}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                    Text("-${halfTime}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                    Text("-${quarterTime}s", color = Color(0xFF6B7280), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                    Text("LIVE", color = CockpitGreen, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 }
 
                 // FROZEN / HOLD Watermark if paused
@@ -589,18 +625,18 @@ fun MultiChannelDsoCard(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF111215).copy(alpha = 0.88f))
+                            .background(Color(0xFF111215).copy(alpha = 0.92f))
                             .border(1.dp, CockpitAmber, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .padding(horizontal = 12.dp, vertical = 5.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Pause,
                                 contentDescription = "Paused",
                                 tint = CockpitAmber,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(14.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "DSO HOLD • BUFFER FROZEN",
                                 color = CockpitAmber,
@@ -628,19 +664,19 @@ fun MultiChannelDsoCard(
                 ) {
                     Text(
                         text = "CH1 min: ${String.format(Locale.US, "%.0f", ch1MinVal)}",
-                        color = TextSecondary,
+                        color = if (ch1Visible) TextSecondary else TextMuted,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "avg: ${String.format(Locale.US, "%.0f", ch1AvgVal)}",
-                        color = TextSecondary,
+                        color = if (ch1Visible) TextSecondary else TextMuted,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "max: ${String.format(Locale.US, "%.0f", ch1MaxVal)}",
-                        color = TextSecondary,
+                        color = if (ch1Visible) TextSecondary else TextMuted,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace
                     )
@@ -653,8 +689,14 @@ fun MultiChannelDsoCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "CH2 max: ${String.format(Locale.US, "%.0f", ch2MaxVal)} $channel2Unit",
-                            color = channel2Color,
+                            text = "CH2 min: ${String.format(Locale.US, "%.0f", ch2MinVal)}",
+                            color = if (ch2Visible) TextSecondary else TextMuted,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = "max: ${String.format(Locale.US, "%.0f", ch2MaxVal)}",
+                            color = if (ch2Visible) TextSecondary else TextMuted,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace
                         )
@@ -662,32 +704,34 @@ fun MultiChannelDsoCard(
                 }
             }
 
-            // Expandable Diagnostic Note
+            // Expandable Diagnostic Note & Technician Analysis
             AnimatedVisibility(
                 visible = showInfoNote,
-                enter = fadeIn(),
-                exit = fadeOut()
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp)
-                        .clip(RoundedCornerShape(6.dp))
+                        .padding(top = 10.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(CockpitCardElevated)
-                        .border(1.dp, CardBorder, RoundedCornerShape(6.dp))
+                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
                         .padding(10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Insight",
-                            tint = CockpitSteel,
+                            contentDescription = "Analysis",
+                            tint = CockpitAmber,
                             modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "AUTOMOTIVE DSO ANALYSIS",
-                            color = CockpitSteel,
+                            text = "DIAGNOSTIC OSCILLOSCOPE INTERPRETATION",
+                            color = CockpitAmber,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -696,7 +740,7 @@ fun MultiChannelDsoCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = diagnosticNote,
-                        color = TextPrimary,
+                        color = TextSecondary,
                         fontSize = 11.sp,
                         lineHeight = 15.sp
                     )

@@ -28,6 +28,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -45,6 +48,7 @@ import com.example.ui.DashboardScreen
 import com.example.ui.DtcScannerScreen
 import com.example.ui.InsightsScreen
 import com.example.ui.LiveTelemetryScreen
+import com.example.ui.LogoIntroScreen
 import com.example.ui.RefuelingScreen
 import com.example.ui.SettingsScreen
 import com.example.ui.StartStopScreen
@@ -75,79 +79,96 @@ val bottomNavItems = listOf(
 
 @Composable
 fun AutoVueNavGraph(viewModel: SharedTelemetryViewModel) {
-    val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val isOnboarding = currentDestination?.route == Screen.Onboarding.route
+    var hasIntroPlayed by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold(
-        bottomBar = {
-            if (!isOnboarding) {
-                NavigationBar(
-                    containerColor = CockpitCard,
-                    tonalElevation = 4.dp,
-                    modifier = Modifier
-                        .background(CockpitBackground)
-                        .border(androidx.compose.foundation.BorderStroke(1.dp, CardBorder))
-                ) {
-                    bottomNavItems.forEach { item ->
-                        val isSelected = currentDestination?.hierarchy?.any { it.route == item.route.route } == true
-                        NavigationBarItem(
-                            icon = {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = item.name,
-                                    tint = if (isSelected) CockpitSteel else TextMuted
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = item.name,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) TextPrimary else TextMuted
-                                )
-                            },
-                            selected = isSelected,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = CockpitSteel,
-                                selectedTextColor = TextPrimary,
-                                unselectedIconColor = TextMuted,
-                                unselectedTextColor = TextMuted,
-                                indicatorColor = CockpitCardElevated
-                            ),
-                            onClick = {
-                                navController.navigate(item.route.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+    if (!hasIntroPlayed) {
+        LogoIntroScreen(
+            onIntroComplete = {
+                hasIntroPlayed = true
+            }
+        )
+    } else {
+        val navController = rememberNavController()
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentDestination = navBackStackEntry?.destination
+        val isOnboarding = currentDestination?.route == Screen.Onboarding.route
+        val hideBottomBar = isOnboarding
+
+        Scaffold(
+            bottomBar = {
+                if (!hideBottomBar) {
+                    NavigationBar(
+                        containerColor = CockpitCard,
+                        tonalElevation = 4.dp,
+                        modifier = Modifier
+                            .background(CockpitBackground)
+                            .border(androidx.compose.foundation.BorderStroke(1.dp, CardBorder))
+                    ) {
+                        bottomNavItems.forEach { item ->
+                            val isSelected = currentDestination?.hierarchy?.any { it.route == item.route.route } == true
+                            NavigationBarItem(
+                                icon = {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = item.name,
+                                        tint = if (isSelected) CockpitSteel else TextMuted
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = item.name,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) TextPrimary else TextMuted
+                                    )
+                                },
+                                selected = isSelected,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = CockpitSteel,
+                                    selectedTextColor = TextPrimary,
+                                    unselectedIconColor = TextMuted,
+                                    unselectedTextColor = TextMuted,
+                                    indicatorColor = CockpitCardElevated
+                                ),
+                                onClick = {
+                                    navController.navigate(item.route.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
-        }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Onboarding.route,
-            modifier = Modifier.padding(if (isOnboarding) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
-        ) {
-            composable(Screen.Onboarding.route) {
-                UserOnboardingScreen(
-                    viewModel = viewModel,
-                    onNavigateToDashboard = {
-                        navController.navigate(Screen.Dashboard.route) {
-                            popUpTo(Screen.Onboarding.route) {
-                                inclusive = true
-                            }
+        ) { innerPadding ->
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Onboarding.route,
+                modifier = Modifier.padding(if (hideBottomBar) androidx.compose.foundation.layout.PaddingValues(0.dp) else innerPadding)
+            ) {
+                composable(Screen.Intro.route) {
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(Screen.Intro.route) { inclusive = true }
                         }
                     }
-                )
-            }
+                }
+                composable(Screen.Onboarding.route) {
+                    UserOnboardingScreen(
+                        viewModel = viewModel,
+                        onNavigateToDashboard = {
+                            navController.navigate(Screen.Dashboard.route) {
+                                popUpTo(Screen.Onboarding.route) {
+                                    inclusive = true
+                                }
+                            }
+                        }
+                    )
+                }
             composable(Screen.Dashboard.route) {
                 DashboardScreen(
                     viewModel = viewModel,
@@ -209,4 +230,5 @@ fun AutoVueNavGraph(viewModel: SharedTelemetryViewModel) {
             }
         }
     }
+}
 }
