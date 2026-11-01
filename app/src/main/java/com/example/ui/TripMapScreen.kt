@@ -1,8 +1,10 @@
 package com.example.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -29,10 +31,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.GpsFixed
+import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Route
@@ -44,6 +50,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +99,9 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.Polygon
+import com.example.model.FuelBunk
+import com.example.model.RegionalFuelBunksRepository
 import java.util.Locale
 
 @Composable
@@ -110,6 +124,25 @@ fun TripMapScreen(
     val tripTickBuffer by viewModel.tripTickBuffer.collectAsState()
     val currentMode by viewModel.currentMapMode.collectAsState()
     val lowFuelAlert by viewModel.lowFuelAlert.collectAsState()
+    val estimatedRangeKm by viewModel.estimatedRangeKm.collectAsState()
+    val currentFuelPercent by viewModel.currentFuelPercent.collectAsState()
+    val currentFuelLiters by viewModel.currentFuelLiters.collectAsState()
+
+    // 1. Collapsible Telemetry State (collapsed by default to maximize map viewing area)
+    val isTelemetryExpanded = remember { mutableStateOf(false) }
+
+    // 2. Petrol Bunks & Range Circumference Feature State
+    val isRangeCircumferenceActive = remember { mutableStateOf(false) }
+    val selectedBunkId = remember { mutableStateOf<String?>(null) }
+    val rangePolygonOverlay = remember { mutableStateOf<Polygon?>(null) }
+    val bunkMarkers = remember { mutableStateOf<List<Marker>>(emptyList()) }
+
+    val effectiveRangeKm = when {
+        estimatedRangeKm > 0.0 -> estimatedRangeKm
+        lowFuelAlert != null -> lowFuelAlert!!.estimatedRangeKm
+        currentFuelLiters > 0.0 -> (currentFuelLiters / 8.0) * 100.0
+        else -> 38.0
+    }
 
     // State for the osmdroid map reference
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
@@ -195,6 +228,7 @@ fun TripMapScreen(
                                 TripMapMode.BEHAVIOUR -> getBehaviourColor(tick2.drivingProfile)
                                 TripMapMode.ANOMALY -> getAnomalyColor(tick2.anomalyScore)
                                 TripMapMode.ROUTE -> android.graphics.Color.parseColor("#FF6B35")
+                                TripMapMode.BUNKS -> android.graphics.Color.parseColor("#EAB308")
                             }
 
                             if (currentSegmentColor == -1) {
@@ -263,6 +297,66 @@ fun TripMapScreen(
             }
 
             tickOverlays.value = newOverlays
+            mv.invalidate()
+        }
+    }
+
+    // Range Circumference & Petrol Bunks Overlay Manager
+    LaunchedEffect(isRangeCircumferenceActive.value, currentMode, effectiveRangeKm, lat, lon, mapViewRef.value) {
+        val mv = mapViewRef.value ?: return@LaunchedEffect
+        val shouldShow = isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS
+
+        // Clean up previous overlays
+        rangePolygonOverlay.value?.let { mv.overlays.remove(it) }
+        rangePolygonOverlay.value = null
+        bunkMarkers.value.forEach { mv.overlays.remove(it) }
+        bunkMarkers.value = emptyList()
+
+        if (shouldShow) {
+            val carLat = lat ?: defaultLat
+            val carLon = lon ?: defaultLon
+            val carPoint = GeoPoint(carLat, carLon)
+
+            // 1. Draw Circumference (range circle) around vehicle location using estimated range
+            val radiusMeters = effectiveRangeKm * 1000.0
+            val circlePoints = Polygon.pointsAsCircle(carPoint, radiusMeters)
+            val poly = Polygon(mv).apply {
+                points = circlePoints
+                fillPaint.color = android.graphics.Color.argb(35, 234, 179, 8)
+                outlinePaint.color = android.graphics.Color.argb(220, 234, 179, 8)
+                outlinePaint.strokeWidth = 5f
+                title = "Estimated Autonomy Limit: ${String.format(Locale.US, "%.1f", effectiveRangeKm)} km"
+            }
+            mv.overlays.add(0, poly)
+            rangePolygonOverlay.value = poly
+
+            // 2. Plot all petrol/fuel bunk locations around the loaded chunk
+            val newMarkers = mutableListOf<Marker>()
+            RegionalFuelBunksRepository.regionalBunks.forEach { bunk ->
+                val dist = RegionalFuelBunksRepository.calculateDistanceKm(carLat, carLon, bunk.lat, bunk.lon)
+                val isReachable = dist <= effectiveRangeKm
+                val marker = Marker(mv).apply {
+                    position = GeoPoint(bunk.lat, bunk.lon)
+                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                    icon = createBunkMarkerIcon(mv.context, isReachable)
+                    title = "${bunk.brand} - ${bunk.name}"
+                    snippet = if (isReachable) {
+                        "Dist: ${String.format(Locale.US, "%.1f", dist)} km • REACHABLE (Refuel before dry)"
+                    } else {
+                        "Dist: ${String.format(Locale.US, "%.1f", dist)} km • OUT OF RANGE (0 km margin)"
+                    }
+                    setOnMarkerClickListener { m, _ ->
+                        selectedBunkId.value = bunk.id
+                        m.showInfoWindow()
+                        true
+                    }
+                }
+                mv.overlays.add(marker)
+                newMarkers.add(marker)
+            }
+            bunkMarkers.value = newMarkers
+            mv.invalidate()
+        } else {
             mv.invalidate()
         }
     }
@@ -368,275 +462,347 @@ fun TripMapScreen(
             }
         }
 
-        // GPS Satellite & Fix Status Bar
+        // GPS Satellite & Fix Status Bar (with Collapsible Telemetry toggle)
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { isTelemetryExpanded.value = !isTelemetryExpanded.value },
             shape = RoundedCornerShape(8.dp),
             colors = CardDefaults.cardColors(containerColor = CockpitCard),
             border = BorderStroke(1.dp, CardBorder)
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val fixColor = when (gpsFix) {
-                        1 -> CockpitGreen
-                        0 -> CockpitAmber
-                        else -> if (hasGps) CockpitSteel else CockpitRed
-                    }
-                    val fixText = when (gpsFix) {
-                        1 -> "3D DGPS FIX"
-                        0 -> "INTERPOLATED (1 Hz)"
-                        else -> if (hasGps) "GPS LOCKED" else "SEARCHING FIX"
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(fixColor)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = fixText,
-                        color = fixColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (gpsFix == 1) "• Real Fix" else if (gpsFix == 0) "• Spline Log" else "• OBD Stream",
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "HEADING: ${formatBearing(bearing)}",
-                        color = TextSecondary,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    IconButton(
-                        onClick = { viewModel.fetchGpsRouteAndSummary() },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Refresh GPS Route",
-                            tint = CockpitSteel,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Live GPS Telemetry Parameters Card Grid
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // 1. Coordinates Card
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = BorderStroke(1.dp, CockpitSurfaceBorder)
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val fixColor = when (gpsFix) {
+                            1 -> CockpitGreen
+                            0 -> CockpitAmber
+                            else -> if (hasGps) CockpitSteel else CockpitRed
+                        }
+                        val fixText = when (gpsFix) {
+                            1 -> "3D DGPS FIX"
+                            0 -> "INTERPOLATED (1 Hz)"
+                            else -> if (hasGps) "GPS LOCKED" else "SEARCHING FIX"
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(fixColor)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "COORDINATES",
-                            color = TextMuted,
-                            fontSize = 9.sp,
+                            text = fixText,
+                            color = fixColor,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = CockpitSteel,
-                            modifier = Modifier.size(12.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (gpsFix == 1) "• Real Fix" else if (gpsFix == 0) "• Spline Log" else "• OBD Stream",
+                            color = TextMuted,
+                            fontSize = 10.sp
                         )
                     }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "HEADING: ${formatBearing(bearing)}",
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        IconButton(
+                            onClick = { viewModel.fetchGpsRouteAndSummary() },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh GPS Route",
+                                tint = CockpitSteel,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        // Collapsible Icon Toggle (Pure icon, zero risk of vertical wrap)
+                        Surface(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable { isTelemetryExpanded.value = !isTelemetryExpanded.value },
+                            shape = CircleShape,
+                            color = if (isTelemetryExpanded.value) CockpitSteel.copy(alpha = 0.25f) else CockpitCardElevated,
+                            border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isTelemetryExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (isTelemetryExpanded.value) "Collapse Telemetry" else "Expand Telemetry",
+                                    tint = if (isTelemetryExpanded.value) TextPrimary else TextSecondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Compact summary when telemetry cards are collapsed
+                if (!isTelemetryExpanded.value) {
                     val (latStr, lonStr) = formatCoordinates(lat, lon)
-                    Text(
-                        text = latStr,
-                        color = TextPrimary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = lonStr,
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            // 2. Elevation & Barometric Pressure
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = BorderStroke(1.dp, CockpitSurfaceBorder)
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                    val elevDisplay = if (elevation != null) "${String.format(Locale.US, "%.1f", elevation)}m" else "24.5m"
+                    val speedDisplay = if (gpsSpeedKmh != null) "${String.format(Locale.US, "%.1f", gpsSpeedKmh)} km/h" else "${currentData.vss.toInt()} km/h"
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "ELEVATION (MSL)",
+                            text = "📍 $latStr, $lonStr • ⛰ $elevDisplay • ⚡ $speedDisplay",
                             color = TextMuted,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            softWrap = false,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Tap to expand",
+                            color = CockpitSteel,
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Terrain,
-                            contentDescription = null,
-                            tint = CockpitGreen,
-                            modifier = Modifier.size(12.dp)
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
-                    val elevDisplay = if (elevation != null) {
-                        "${String.format(Locale.US, "%.1f", elevation)} m"
-                    } else {
-                        "24.5 m MSL"
-                    }
-                    Text(
-                        text = elevDisplay,
-                        color = TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "MAP: ${currentData.mapKpa.toInt()} kPa (Baro)",
-                        color = TextSecondary,
-                        fontSize = 10.sp
-                    )
                 }
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Live GPS Telemetry Parameters Card Grid (Collapsible)
+        AnimatedVisibility(
+            visible = isTelemetryExpanded.value,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
         ) {
-            // 3. GPS Speed vs ECU Speed Sensor
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = BorderStroke(1.dp, CockpitSurfaceBorder)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // 1. Coordinates Card
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                        border = BorderStroke(1.dp, CockpitSurfaceBorder)
                     ) {
-                        Text(
-                            text = "SPEED (GPS vs ECU)",
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Speed,
-                            contentDescription = null,
-                            tint = CockpitAmber,
-                            modifier = Modifier.size(12.dp)
-                        )
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "COORDINATES",
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = CockpitSteel,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            val (latStr, lonStr) = formatCoordinates(lat, lon)
+                            Text(
+                                text = latStr,
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = lonStr,
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
-                    val speedDisplay = if (gpsSpeedKmh != null) {
-                        "${String.format(Locale.US, "%.1f", gpsSpeedKmh)} km/h"
-                    } else {
-                        "${currentData.vss.toInt()} km/h"
-                    }
-                    Text(
-                        text = speedDisplay,
-                        color = TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    val speedDetail = if (gpsSpeedMs != null) {
-                        "${String.format(Locale.US, "%.1f", gpsSpeedMs)} m/s • ECU: ${currentData.vss.toInt()} km/h"
-                    } else {
-                        "ECU VSS Wheel Sensor"
-                    }
-                    Text(
-                        text = speedDetail,
-                        color = TextSecondary,
-                        fontSize = 10.sp
-                    )
-                }
-            }
 
-            // 4. Heading / Compass Bearing
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
-                border = BorderStroke(1.dp, CockpitSurfaceBorder)
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // 2. Elevation & Barometric Pressure
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                        border = BorderStroke(1.dp, CockpitSurfaceBorder)
                     ) {
-                        Text(
-                            text = "BEARING / HEADING",
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Explore,
-                            contentDescription = null,
-                            tint = CockpitSteel,
-                            modifier = Modifier.size(12.dp)
-                        )
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "ELEVATION (MSL)",
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Terrain,
+                                    contentDescription = null,
+                                    tint = CockpitGreen,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            val elevDisplay = if (elevation != null) {
+                                "${String.format(Locale.US, "%.1f", elevation)} m"
+                            } else {
+                                "24.5 m MSL"
+                            }
+                            Text(
+                                text = elevDisplay,
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "MAP: ${currentData.mapKpa.toInt()} kPa (Baro)",
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
-                    Text(
-                        text = formatBearing(bearing),
-                        color = TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "True North Reference",
-                        color = TextMuted,
-                        fontSize = 10.sp
-                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // 3. GPS Speed vs ECU Speed Sensor
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                        border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SPEED (GPS vs ECU)",
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Speed,
+                                    contentDescription = null,
+                                    tint = CockpitAmber,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            val speedDisplay = if (gpsSpeedKmh != null) {
+                                "${String.format(Locale.US, "%.1f", gpsSpeedKmh)} km/h"
+                            } else {
+                                "${currentData.vss.toInt()} km/h"
+                            }
+                            Text(
+                                text = speedDisplay,
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            val speedDetail = if (gpsSpeedMs != null) {
+                                "${String.format(Locale.US, "%.1f", gpsSpeedMs)} m/s • ECU: ${currentData.vss.toInt()} km/h"
+                            } else {
+                                "ECU VSS Wheel Sensor"
+                            }
+                            Text(
+                                text = speedDetail,
+                                color = TextSecondary,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // 4. Heading / Compass Bearing
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                        border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "BEARING / HEADING",
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Explore,
+                                    contentDescription = null,
+                                    tint = CockpitSteel,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                            Text(
+                                text = formatBearing(bearing),
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "True North Reference",
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -660,7 +826,8 @@ fun TripMapScreen(
                     val activeBg = when (mode) {
                         TripMapMode.ROUTE -> Color(0xFFFF6B35) // App orange accent
                         TripMapMode.FUEL -> Color(0xFF22C55E)  // Green
-                        TripMapMode.SPEED -> Color(0xFFEAB308) // Yellow
+                        TripMapMode.BUNKS -> Color(0xFFEAB308) // Amber / Range Gold
+                        TripMapMode.SPEED -> Color(0xFF38BDF8) // Sky blue
                         TripMapMode.BEHAVIOUR -> Color(0xFFA855F7) // Purple
                         TripMapMode.ANOMALY -> Color(0xFFEF4444) // Red
                     }
@@ -668,7 +835,12 @@ fun TripMapScreen(
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .clickable { viewModel.setTripMapMode(mode) },
+                            .clickable {
+                                viewModel.setTripMapMode(mode)
+                                if (mode == TripMapMode.BUNKS) {
+                                    isRangeCircumferenceActive.value = true
+                                }
+                            },
                         shape = RoundedCornerShape(20.dp),
                         color = if (isSelected) activeBg else CockpitCardElevated,
                         border = BorderStroke(
@@ -734,6 +906,21 @@ fun TripMapScreen(
                             InfoStripItem(label = "Trip used", value = "${String.format(Locale.US, "%.1f", tripUsed)} L")
                             Text("|", color = TextMuted, fontSize = 11.sp)
                             InfoStripItem(label = "Est. remaining", value = "~${estRemain.toInt()} km")
+                        }
+                        TripMapMode.BUNKS -> {
+                            val carLat = lat ?: defaultLat
+                            val carLon = lon ?: defaultLon
+                            val bunksWithDist = RegionalFuelBunksRepository.regionalBunks.map {
+                                it to RegionalFuelBunksRepository.calculateDistanceKm(carLat, carLon, it.lat, it.lon)
+                            }
+                            val reachableCount = bunksWithDist.count { it.second <= effectiveRangeKm }
+                            val nearest = bunksWithDist.minByOrNull { it.second }
+                            InfoStripItem(label = "Abs. Range", value = "${effectiveRangeKm.toInt()} km")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            InfoStripItem(label = "In Range", value = "$reachableCount bunks")
+                            Text("|", color = TextMuted, fontSize = 11.sp)
+                            val nearestText = nearest?.let { "${it.first.brand} (${String.format(Locale.US, "%.1f", it.second)} km)" } ?: "IOC (1.2 km)"
+                            InfoStripItem(label = "Nearest", value = nearestText)
                         }
                         TripMapMode.SPEED -> {
                             val avgSpd = tripSummary?.tripStats?.avgSpeedKmh?.takeIf { it > 0 } ?: 42.3
@@ -815,6 +1002,57 @@ fun TripMapScreen(
                     HeatmapLegendBar(mode = currentMode)
                 }
 
+                // Quick Floating Map Action: Toggle Range Circumference & Petrol Bunks
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 8.dp, bottom = 8.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            val willBeActive = !isRangeCircumferenceActive.value
+                            isRangeCircumferenceActive.value = willBeActive
+                            if (willBeActive) {
+                                val mv = mapViewRef.value
+                                if (mv != null) {
+                                    val carLat = lat ?: defaultLat
+                                    val carLon = lon ?: defaultLon
+                                    mv.controller.setCenter(GeoPoint(carLat, carLon))
+                                    val zoomLvl = if (effectiveRangeKm > 50) 10.5 else if (effectiveRangeKm > 20) 12.0 else 13.0
+                                    mv.controller.setZoom(zoomLvl)
+                                }
+                            }
+                        },
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS)
+                        Color(0xFFEAB308).copy(alpha = 0.95f)
+                    else
+                        CockpitCardElevated.copy(alpha = 0.9f),
+                    border = BorderStroke(
+                        1.dp,
+                        if (isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS) Color(0xFFFDE047) else CockpitSurfaceBorder
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "⛽",
+                            fontSize = 11.sp
+                        )
+                        Text(
+                            text = if (isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS)
+                                "Range: ${effectiveRangeKm.toInt()} km"
+                            else
+                                "Range & Bunks",
+                            color = if (isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS) Color.Black else TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
                 // Quick Floating Map Action: Fit Driven Trail
                 Surface(
                     modifier = Modifier
@@ -867,6 +1105,329 @@ fun TripMapScreen(
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+            }
+
+            // =========================================================================
+            // PETROL BUNKS INSIDE ESTIMATED RANGE SECTION
+            // Shows circumference details, absolute vehicle range, and mapped bunks
+            // where driver must refuel before running empty.
+            // =========================================================================
+            if (isRangeCircumferenceActive.value || currentMode == TripMapMode.BUNKS) {
+                val carLat = lat ?: defaultLat
+                val carLon = lon ?: defaultLon
+                val bunksWithDistance = remember(carLat, carLon, effectiveRangeKm) {
+                    RegionalFuelBunksRepository.regionalBunks.map { bunk ->
+                        val dist = RegionalFuelBunksRepository.calculateDistanceKm(carLat, carLon, bunk.lat, bunk.lon)
+                        val isReachable = dist <= effectiveRangeKm
+                        Triple(bunk, dist, isReachable)
+                    }.sortedBy { it.second }
+                }
+
+                val reachableBunks = bunksWithDistance.filter { it.third }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = CockpitCard),
+                    border = BorderStroke(1.dp, Color(0xFFEAB308).copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Header Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "⛽", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column {
+                                    Text(
+                                        text = "ESTIMATED RANGE & REFUEL ADVISOR",
+                                        color = TextPrimary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Circumference indicates absolute reachable boundary",
+                                        color = TextMuted,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = if (effectiveRangeKm <= 40.0) CockpitAmber.copy(alpha = 0.2f) else CockpitGreen.copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, if (effectiveRangeKm <= 40.0) CockpitAmber else CockpitGreen)
+                            ) {
+                                Text(
+                                    text = if (effectiveRangeKm <= 40.0) "LOW AUTONOMY" else "ACTIVE CIRCLE",
+                                    color = if (effectiveRangeKm <= 40.0) CockpitAmber else CockpitGreen,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        // Summary Statistics Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = CockpitCardElevated),
+                            border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = "ABSOLUTE RANGE",
+                                        color = TextMuted,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", effectiveRangeKm)} km",
+                                        color = Color(0xFFEAB308),
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "Engine cuts out at 0 km",
+                                        color = TextSecondary,
+                                        fontSize = 9.sp
+                                    )
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = "BUNKS IN RANGE",
+                                        color = TextMuted,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${reachableBunks.size} / ${bunksWithDistance.size}",
+                                        color = CockpitGreen,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "Safe to refuel here",
+                                        color = TextSecondary,
+                                        fontSize = 9.sp
+                                    )
+                                }
+
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(
+                                        text = "TANK REMAINING",
+                                        color = TextMuted,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${String.format(Locale.US, "%.1f", currentFuelLiters)} L",
+                                        color = TextPrimary,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "${currentFuelPercent.toInt()}% tank capacity",
+                                        color = TextSecondary,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Guidance Banner
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFF1E293B),
+                            border = BorderStroke(1.dp, CockpitSurfaceBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(text = "⚠️", fontSize = 12.sp)
+                                Text(
+                                    text = "Refuel at one of the ${reachableBunks.size} stations listed below before reaching the outer range circumference on the map. Stations marked 'Out of Range' cannot be reached on remaining fuel.",
+                                    color = TextSecondary,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+
+                        // Stations List Header
+                        Text(
+                            text = "FUEL BUNKS IN LOADED CHUNK (${reachableBunks.size} REACHABLE BEFORE EMPTY)",
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        // Mapped Bunks Cards
+                        bunksWithDistance.forEach { (bunk, dist, isReachable) ->
+                            val isSelected = selectedBunkId.value == bunk.id
+                            val bufferRemainingKm = (effectiveRangeKm - dist).coerceAtLeast(0.0)
+
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selectedBunkId.value = bunk.id
+                                        mapViewRef.value?.let { mv ->
+                                            mv.controller.animateTo(GeoPoint(bunk.lat, bunk.lon))
+                                            mv.controller.setZoom(16.0)
+                                        }
+                                    },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) CockpitCardElevated.copy(alpha = 0.95f) else CockpitCardElevated
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) Color(0xFFEAB308) else if (isReachable) CockpitSurfaceBorder else CockpitRed.copy(alpha = 0.3f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = when (bunk.brand) {
+                                                    "Shell" -> Color(0xFFF59E0B).copy(alpha = 0.2f)
+                                                    "Indian Oil" -> Color(0xFFEA580C).copy(alpha = 0.2f)
+                                                    "Bharat Petroleum" -> Color(0xFF2563EB).copy(alpha = 0.2f)
+                                                    "HPCL" -> Color(0xFF0D9488).copy(alpha = 0.2f)
+                                                    else -> Color(0xFF64748B).copy(alpha = 0.2f)
+                                                }
+                                            ) {
+                                                Text(
+                                                    text = bunk.brand,
+                                                    color = when (bunk.brand) {
+                                                        "Shell" -> Color(0xFFF59E0B)
+                                                        "Indian Oil" -> Color(0xFFEA580C)
+                                                        "Bharat Petroleum" -> Color(0xFF60A5FA)
+                                                        "HPCL" -> Color(0xFF2DD4BF)
+                                                        else -> TextSecondary
+                                                    },
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                            Text(
+                                                text = bunk.name,
+                                                color = TextPrimary,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1
+                                            )
+                                        }
+
+                                        Text(
+                                            text = bunk.address,
+                                            color = TextMuted,
+                                            fontSize = 9.sp,
+                                            maxLines = 1
+                                        )
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Text(
+                                                text = "₹${bunk.pricePerLiter}/L",
+                                                color = TextSecondary,
+                                                fontSize = 10.sp,
+                                                fontFamily = FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "• " + bunk.fuelsAvailable.joinToString(", "),
+                                                color = TextMuted,
+                                                fontSize = 9.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Column(
+                                        horizontalAlignment = Alignment.End,
+                                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                                    ) {
+                                        Text(
+                                            text = "${String.format(Locale.US, "%.1f", dist)} km",
+                                            color = if (isReachable) CockpitGreen else CockpitRed,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = if (isReachable) CockpitGreen.copy(alpha = 0.15f) else CockpitRed.copy(alpha = 0.15f),
+                                            border = BorderStroke(1.dp, if (isReachable) CockpitGreen.copy(alpha = 0.5f) else CockpitRed.copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                text = if (isReachable) "REACHABLE" else "OUT OF RANGE",
+                                                color = if (isReachable) CockpitGreen else CockpitRed,
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+
+                                        if (isReachable) {
+                                            Text(
+                                                text = "+${bufferRemainingKm.toInt()} km margin",
+                                                color = TextMuted,
+                                                fontSize = 8.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "Car runs empty",
+                                                color = CockpitRed,
+                                                fontSize = 8.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1128,6 +1689,18 @@ private fun HeatmapLegendBar(mode: TripMapMode) {
                 LegendPill(color = Color(0xFFEF4444), label = "AGGRESSIVE")
             }
         }
+        TripMapMode.BUNKS -> {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Range & Bunks:", color = TextSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                LegendPill(color = Color(0xFF22C55E), label = "Reachable Bunk")
+                LegendPill(color = Color(0xFFEAB308), label = "Range Limit")
+                LegendPill(color = Color(0xFFEF4444), label = "Out of Range")
+            }
+        }
         TripMapMode.ANOMALY -> {
             Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -1161,6 +1734,42 @@ private fun LegendPill(color: Color, label: String) {
             fontWeight = FontWeight.Medium
         )
     }
+}
+
+private fun createBunkMarkerIcon(context: android.content.Context, isReachable: Boolean): Drawable {
+    val density = context.resources.displayMetrics.density
+    val sizePx = (34 * density).toInt()
+    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // Outer circle
+    paint.color = if (isReachable) {
+        android.graphics.Color.parseColor("#15803D") // Rich green
+    } else {
+        android.graphics.Color.parseColor("#475569") // Slate gray
+    }
+    paint.style = Paint.Style.FILL
+    val center = sizePx / 2f
+    val radius = sizePx / 2f - (2 * density)
+    canvas.drawCircle(center, center, radius, paint)
+
+    // Border
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = 2.5f * density
+    paint.color = if (isReachable) android.graphics.Color.parseColor("#4ADE80") else android.graphics.Color.parseColor("#94A3B8")
+    canvas.drawCircle(center, center, radius, paint)
+
+    // Text symbol "⛽"
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = 14f * density
+        textAlign = Paint.Align.CENTER
+    }
+    val yPos = center - ((textPaint.descent() + textPaint.ascent()) / 2)
+    canvas.drawText("⛽", center, yPos, textPaint)
+
+    return BitmapDrawable(context.resources, bitmap)
 }
 
 private fun getFuelColor(consumption: Double): Int {

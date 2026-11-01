@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CardBorder
@@ -176,6 +177,7 @@ fun DtcScannerScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Row(
+                                            modifier = Modifier.weight(1f),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
@@ -189,16 +191,23 @@ fun DtcScannerScreen(
                                                     text = dtc.code,
                                                     color = accentColor,
                                                     fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Black
+                                                    fontWeight = FontWeight.Black,
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
                                             Text(
                                                 text = dtc.description,
                                                 color = TextPrimary,
                                                 fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false)
                                             )
                                         }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
 
                                         Box(
                                             modifier = Modifier
@@ -210,7 +219,9 @@ fun DtcScannerScreen(
                                                 text = if (isCritical) "HIGH PRIORITY" else "ATTENTION",
                                                 color = accentColor,
                                                 fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                         }
                                     }
@@ -272,7 +283,9 @@ fun DtcScannerScreen(
                     text = "RE-SCAN",
                     color = TextPrimary,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
@@ -294,7 +307,9 @@ fun DtcScannerScreen(
                     text = "TEST FAULT",
                     color = TextPrimary,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 
@@ -316,7 +331,9 @@ fun DtcScannerScreen(
                         text = "CLEAR",
                         color = CockpitRed,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }

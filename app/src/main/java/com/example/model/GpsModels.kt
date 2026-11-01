@@ -64,6 +64,7 @@ data class DtcRequest(
 enum class TripMapMode(val id: String, val label: String, val icon: String) {
     ROUTE("route", "Route", "🔵"),
     FUEL("fuel", "Fuel", "🌡"),
+    BUNKS("bunks", "Range & Bunks", "⛽"),
     SPEED("speed", "Speed", "🚗"),
     BEHAVIOUR("behaviour", "Behaviour", "🧠"),
     ANOMALY("anomaly", "Anomaly", "⚠")

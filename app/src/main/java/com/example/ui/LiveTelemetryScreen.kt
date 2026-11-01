@@ -3,7 +3,6 @@ package com.example.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,23 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,10 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,7 +39,6 @@ import androidx.compose.ui.unit.sp
 import com.example.components.DsoZoneHighlight
 import com.example.components.MultiChannelDsoCard
 import com.example.model.TelemetryData
-import com.example.model.TelemetryTick
 import com.example.ui.theme.CardBorder
 import com.example.ui.theme.CockpitAmber
 import com.example.ui.theme.CockpitBackground
@@ -62,7 +47,6 @@ import com.example.ui.theme.CockpitCardElevated
 import com.example.ui.theme.CockpitGreen
 import com.example.ui.theme.CockpitRed
 import com.example.ui.theme.CockpitSteel
-import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.viewmodel.SharedTelemetryViewModel
@@ -86,12 +70,6 @@ fun LiveTelemetryScreen(
     val tick by viewModel.latestTick.collectAsState()
     val history by viewModel.history.collectAsState()
 
-    // Interactive DSO oscilloscope controls
-    var isPaused by remember { mutableStateOf(false) }
-    var frozenHistory by remember { mutableStateOf<List<TelemetryTick>>(emptyList()) }
-    var windowSeconds by remember { mutableIntStateOf(30) }
-    var triggerMode by remember { mutableStateOf("AUTO") }
-
     val currentData = tick?.data ?: TelemetryData(
         coolantTemp = 88.0,
         mapKpa = 36.0,
@@ -103,12 +81,7 @@ fun LiveTelemetryScreen(
         ambientTemp = 22.0
     )
 
-    // When paused, hold the frozen snapshot; otherwise stream live history
-    val activeHistory = if (isPaused) {
-        if (frozenHistory.isNotEmpty()) frozenHistory else history
-    } else {
-        history
-    }
+    val activeHistory = history
 
     // 1. Channel 1 & 2: RPM vs Vehicle Speed Correlation
     val rpmHistory = if (activeHistory.isNotEmpty()) {
@@ -202,11 +175,11 @@ fun LiveTelemetryScreen(
                             modifier = Modifier
                                 .size(9.dp)
                                 .clip(CircleShape)
-                                .background(if (isPaused) CockpitAmber else CockpitGreen)
+                                .background(CockpitGreen)
                         )
                         Text(
-                            text = if (isPaused) "DSO BUFFER FROZEN (HOLD)" else "LIVE OBD-II DSO STREAM",
-                            color = if (isPaused) CockpitAmber else CockpitGreen,
+                            text = "LIVE OBD-II DSO STREAM",
+                            color = CockpitGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
@@ -247,140 +220,6 @@ fun LiveTelemetryScreen(
                     fontSize = 12.sp,
                     lineHeight = 16.sp
                 )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // ==============================================================
-                // Interactive Scope Controls: Freeze & Segmented Timebase Bar
-                // ==============================================================
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CockpitCardElevated)
-                        .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-                        .padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Row 1: Run/Hold Main Toggle Button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = {
-                                if (!isPaused) {
-                                    frozenHistory = history
-                                    isPaused = true
-                                } else {
-                                    isPaused = false
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isPaused) CockpitAmber else CockpitSteel,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                                    contentDescription = if (isPaused) "Resume" else "Freeze",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = if (isPaused) "RESUME LIVE STREAM" else "FREEZE DSO BUFFER",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    letterSpacing = 0.5.sp
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        // Trigger Mode Toggle
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(CockpitCard)
-                                .border(1.dp, CardBorder, RoundedCornerShape(8.dp))
-                                .clickable {
-                                    triggerMode = if (triggerMode == "AUTO") "SINGLE" else "AUTO"
-                                }
-                                .padding(horizontal = 10.dp, vertical = 10.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = "Trigger Mode",
-                                    tint = CockpitSteel,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "TRIG: $triggerMode",
-                                    color = TextPrimary,
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // Row 2: Precision Segmented Timebase Window Selector (10s, 30s, 60s, 120s)
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "TIMEBASE SWEEP WINDOW:",
-                            color = TextSecondary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            fontFamily = FontFamily.Monospace
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(CockpitCard)
-                                .border(1.dp, CardBorder, RoundedCornerShape(6.dp))
-                                .padding(3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            val timeOptions = listOf(10, 30, 60, 120)
-                            timeOptions.forEach { sec ->
-                                val isSelected = windowSeconds == sec
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(32.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(if (isSelected) CockpitSteel else Color.Transparent)
-                                        .clickable { windowSeconds = sec },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${sec}s",
-                                        color = if (isSelected) Color.White else TextSecondary,
-                                        fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -410,9 +249,7 @@ fun LiveTelemetryScreen(
             // Overlays & Correlation Metric
             correlationMetricLabel = "Coupling Ratio",
             correlationMetricValue = couplingRatioText,
-            diagnosticNote = "Correlates crankshaft rotational speed (CH1) directly against road velocity (CH2) on synchronized oscilloscope channels. Analyzes transmission gear ratio engagement, clutch lockup efficiency, torque converter slip, and power band acceleration delivery under load.",
-            isPaused = isPaused,
-            windowSeconds = windowSeconds
+            diagnosticNote = "Correlates crankshaft rotational speed (CH1) directly against road velocity (CH2) on synchronized oscilloscope channels. Analyzes transmission gear ratio engagement, clutch lockup efficiency, torque converter slip, and power band acceleration delivery under load."
         )
 
         // ==============================================================
@@ -444,9 +281,7 @@ fun LiveTelemetryScreen(
             referenceColor = Color(0xFF9E9E9E),
             correlationMetricLabel = "Induction State",
             correlationMetricValue = inductionStateText,
-            diagnosticNote = "Monitors manifold vacuum collapse and throttle actuator transient response. A sluggish MAP rise during snap-throttle indicates intake restrictions or electronic throttle body delay, while abnormally high idle MAP indicates intake plenum vacuum leaks.",
-            isPaused = isPaused,
-            windowSeconds = windowSeconds
+            diagnosticNote = "Monitors manifold vacuum collapse and throttle actuator transient response. A sluggish MAP rise during snap-throttle indicates intake restrictions or electronic throttle body delay, while abnormally high idle MAP indicates intake plenum vacuum leaks."
         )
 
         // ==============================================================
@@ -484,54 +319,8 @@ fun LiveTelemetryScreen(
             ),
             correlationMetricLabel = "Thermal Phase",
             correlationMetricValue = thermalStageText,
-            diagnosticNote = "Plots engine thermal progression from cold start through thermostat opening. Verifies cooling system regulation, prevents high-load cold-engine wear, and monitors the temperature drop dip when the thermostat opens into the radiator.",
-            isPaused = isPaused,
-            windowSeconds = windowSeconds
+            diagnosticNote = "Plots engine thermal progression from cold start through thermostat opening. Verifies cooling system regulation, prevents high-load cold-engine wear, and monitors the temperature drop dip when the thermostat opens into the radiator."
         )
-
-        // ==============================================================
-        // DSO Technical Hardware & Channel Architecture Footer
-        // ==============================================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = CockpitCard),
-            border = BorderStroke(1.dp, CardBorder)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Timeline,
-                        contentDescription = "DSO Architecture",
-                        tint = CockpitSteel,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "AUTOMOTIVE DSO SIGNAL PROCESSING SPECIFICATION",
-                        color = TextPrimary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Text(
-                    text = "Waveforms are synchronized across a dual-channel ring buffer sampling via the vehicle's OBD-II CAN bus. The digital storage oscilloscope engine performs on-device scale normalization, anti-aliased Bézier interpolation, and peak detection to provide dealer-grade diagnostic visibility without external lab scopes.",
-                    color = TextSecondary,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp
-                )
-            }
-        }
 
         Spacer(modifier = Modifier.height(8.dp))
     }
