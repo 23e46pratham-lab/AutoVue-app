@@ -61,13 +61,13 @@ data class DtcRequest(
     @Json(name = "codes") val codes: List<String>
 )
 
-enum class TripMapMode(val id: String, val label: String, val icon: String) {
-    ROUTE("route", "Route", "🔵"),
-    FUEL("fuel", "Fuel", "🌡"),
-    BUNKS("bunks", "Range & Bunks", "⛽"),
-    SPEED("speed", "Speed", "🚗"),
-    BEHAVIOUR("behaviour", "Behaviour", "🧠"),
-    ANOMALY("anomaly", "Anomaly", "⚠")
+enum class TripMapMode(val id: String, val label: String) {
+    ROUTE("route", "Route"),
+    FUEL("fuel", "Fuel"),
+    BUNKS("bunks", "Range & Bunks"),
+    SPEED("speed", "Speed"),
+    BEHAVIOUR("behaviour", "Behaviour"),
+    ANOMALY("anomaly", "Anomaly")
 }
 
 data class TripTickItem(

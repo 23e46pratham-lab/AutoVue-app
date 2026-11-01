@@ -71,7 +71,10 @@ data class TripHistoryItem(
         "Gear shift efficiency: 94%"
     ),
     val waypoints: List<String> = listOf("Start", "Midway Arterial", "Arrival"),
-    val routeType: Int = 0
+    val routeType: Int = 0,
+    val currency: String = "₹",
+    val lastCoords: String = "",
+    val tickSnapshot: List<TripTickItem> = emptyList()
 )
 
 data class VehicleEventLog(

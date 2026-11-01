@@ -179,23 +179,67 @@ class SharedTelemetryViewModel(
     private val _estimatedRangeKm = MutableStateFlow(152.0)
     val estimatedRangeKm = _estimatedRangeKm.asStateFlow()
 
-    private val _fuelPricePerLiter = MutableStateFlow(1.78)
+    private val _fuelPricePerLiter = MutableStateFlow(96.72)
     val fuelPricePerLiter = _fuelPricePerLiter.asStateFlow()
 
-    private val _fuelCurrency = MutableStateFlow("€")
+    private val _fuelCurrency = MutableStateFlow("₹")
     val fuelCurrency = _fuelCurrency.asStateFlow()
 
     val regionalFuelPresets = listOf(
-        com.example.model.RegionalFuelPreset("preset-eu-petrol", "Europe (Central)", "Eurosuper 95", 1.78, "€", isAutoDetected = true),
-        com.example.model.RegionalFuelPreset("preset-eu-diesel", "Europe (Central)", "Diesel", 1.65, "€"),
-        com.example.model.RegionalFuelPreset("preset-in-petrol", "India (Karnataka / National)", "Petrol", 96.72, "₹"),
+        com.example.model.RegionalFuelPreset("preset-in-petrol", "India (Karnataka / National)", "Petrol", 96.72, "₹", isAutoDetected = true),
         com.example.model.RegionalFuelPreset("preset-in-diesel", "India (Karnataka / National)", "Diesel", 89.62, "₹"),
+        com.example.model.RegionalFuelPreset("preset-eu-petrol", "Europe (Central)", "Eurosuper 95", 1.78, "€"),
+        com.example.model.RegionalFuelPreset("preset-eu-diesel", "Europe (Central)", "Diesel", 1.65, "€"),
         com.example.model.RegionalFuelPreset("preset-us-regular", "United States (National Avg)", "Regular Unleaded 87", 0.92, "$"),
         com.example.model.RegionalFuelPreset("preset-uk-petrol", "United Kingdom", "Premium Unleaded 95", 1.45, "£")
     )
 
     private val _selectedFuelPreset = MutableStateFlow(regionalFuelPresets[0])
     val selectedFuelPreset = _selectedFuelPreset.asStateFlow()
+
+    fun saveCurrentTripSnapshot(onSaved: (String) -> Unit = {}) {
+        val now = System.currentTimeMillis()
+        val dateStr = SimpleDateFormat("dd/MM/yy", Locale.US).format(Date(now))
+        val timeStr = SimpleDateFormat("HH:mm", Locale.US).format(Date(now))
+        val dist = _tripDistanceKm.value
+        val cost = _tripCostEuro.value
+        val duration = _tripElapsedTimeMinutes.value
+        val ticks = _tripTickBuffer.value
+        val avgSpd = if (ticks.isNotEmpty()) ticks.map { it.vss }.average() else 35.0
+        val maxSpd = if (ticks.isNotEmpty()) ticks.maxOfOrNull { it.vss } ?: 70.0 else 70.0
+        val avgThrot = if (ticks.isNotEmpty()) ticks.map { it.throttlePos }.average() else 25.0
+        val maxRpmVal = if (ticks.isNotEmpty()) ticks.maxOfOrNull { it.rpm }?.toInt() ?: 3200 else 3200
+        val lastPoint = ticks.lastOrNull()
+        val coordsStr = if (lastPoint != null) "${String.format(Locale.US, "%.5f", lastPoint.lat)}, ${String.format(Locale.US, "%.5f", lastPoint.lon)}" else "12.91345°, 74.88922°"
+
+        val item = TripHistoryItem(
+            id = "trip_$now",
+            date = dateStr,
+            time = timeStr,
+            departure = "Start Location",
+            destination = "Current Position",
+            durationMinutes = duration,
+            distanceKm = dist,
+            driveScorePercent = 88.5,
+            fuelCostEuro = cost,
+            consumptionKmL = _averageFuelEconomyKmL.value,
+            avgSpeedKmh = avgSpd,
+            maxSpeedKmh = maxSpd,
+            fuelUsedLiters = _fuelConsumedTripLiters.value,
+            maxRpm = maxRpmVal,
+            currency = _fuelCurrency.value,
+            lastCoords = coordsStr,
+            tickSnapshot = ticks,
+            specificEvents = listOf(
+                "Trip saved successfully @ $timeStr",
+                "Total Distance: ${String.format(Locale.US, "%.2f", dist)} km",
+                "Total Cost: ${_fuelCurrency.value}${String.format(Locale.US, "%.2f", cost)}"
+            )
+        )
+        _tripHistory.value = listOf(item) + _tripHistory.value
+        ttsManager.speak("Trip successfully saved to history. Distance ${String.format(Locale.US, "%.1f", dist)} kilometers.")
+        onSaved(item.id)
+    }
 
     private val _isCustomFuelPrice = MutableStateFlow(false)
     val isCustomFuelPrice = _isCustomFuelPrice.asStateFlow()
@@ -258,6 +302,12 @@ class SharedTelemetryViewModel(
 
     fun setTripMapMode(mode: com.example.model.TripMapMode) {
         _currentMapMode.value = mode
+    }
+
+    fun refreshMapTrail() {
+        _liveGpsTrail.value = emptyList()
+        _tripTickBuffer.value = emptyList()
+        fetchGpsRouteAndSummary()
     }
 
     fun dismissFuelAlert() {
@@ -767,7 +817,24 @@ class SharedTelemetryViewModel(
                         val lon = tick.data.lon
                         if (lat != null && lon != null) {
                             val currentGpsList = _liveGpsTrail.value.toMutableList()
+                            val firstPoint = currentGpsList.firstOrNull()
                             val lastPoint = currentGpsList.lastOrNull()
+                            if (firstPoint != null && lastPoint != null) {
+                                val distFromStart = haversineKm(firstPoint.first, firstPoint.second, lat, lon)
+                                val lastDistFromStart = haversineKm(firstPoint.first, firstPoint.second, lastPoint.first, lastPoint.second)
+                                val jumpKm = haversineKm(lastPoint.first, lastPoint.second, lat, lon)
+                                if (jumpKm > 3.0 || (currentGpsList.size > 15 && lastDistFromStart > 0.5 && distFromStart < 0.08)) {
+                                    currentGpsList.clear()
+                                    _tripTickBuffer.value = emptyList()
+                                }
+                            } else if (lastPoint != null) {
+                                val jumpKm = haversineKm(lastPoint.first, lastPoint.second, lat, lon)
+                                if (jumpKm > 3.0) {
+                                    currentGpsList.clear()
+                                    _tripTickBuffer.value = emptyList()
+                                }
+                            }
+
                             if (lastPoint == null || Math.abs(lastPoint.first - lat) > 0.00001 || Math.abs(lastPoint.second - lon) > 0.00001) {
                                 currentGpsList.add(Pair(lat, lon))
                                 if (currentGpsList.size > 2000) currentGpsList.removeAt(0)
@@ -801,6 +868,13 @@ class SharedTelemetryViewModel(
                             )
 
                             val currentTripBuffer = _tripTickBuffer.value.toMutableList()
+                            val lastTripPoint = currentTripBuffer.lastOrNull()
+                            if (lastTripPoint != null && lastTripPoint.lat != null && lastTripPoint.lon != null) {
+                                val jumpKm = haversineKm(lastTripPoint.lat, lastTripPoint.lon, lat, lon)
+                                if (jumpKm > 3.0) {
+                                    currentTripBuffer.clear()
+                                }
+                            }
                             currentTripBuffer.add(tripItem)
                             if (currentTripBuffer.size > 2500) {
                                 currentTripBuffer.removeAt(0)

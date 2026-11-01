@@ -42,8 +42,11 @@ import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Terrain
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -188,8 +191,8 @@ fun TripMapScreen(
     val gpsFix = currentData.gpsFix
     val hasGps = currentData.hasGps || routeData?.hasGps == true || liveGpsTrail.isNotEmpty()
 
-    // Draw/update heatmap / route overlays whenever telemetry or mode changes
-    LaunchedEffect(tripTickBuffer, currentMode) {
+    // Draw/update heatmap / route overlays whenever telemetry, mode or mapView changes
+    LaunchedEffect(tripTickBuffer, currentMode, mapViewRef.value) {
         val mv = mapViewRef.value ?: return@LaunchedEffect
         // Remove existing overlays
         tickOverlays.value.forEach { mv.overlays.remove(it) }
@@ -415,10 +418,11 @@ fun TripMapScreen(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "⛽",
-                            fontSize = 20.sp,
-                            color = Color(0xFFEAB308)
+                        Icon(
+                            imageVector = Icons.Default.LocalGasStation,
+                            contentDescription = "Low Fuel",
+                            tint = Color(0xFFEAB308),
+                            modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -483,64 +487,61 @@ fun TripMapScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         val fixColor = when (gpsFix) {
                             1 -> CockpitGreen
                             0 -> CockpitAmber
                             else -> if (hasGps) CockpitSteel else CockpitRed
                         }
                         val fixText = when (gpsFix) {
-                            1 -> "3D DGPS FIX"
-                            0 -> "INTERPOLATED (1 Hz)"
-                            else -> if (hasGps) "GPS LOCKED" else "SEARCHING FIX"
+                            1 -> "GPS 3D"
+                            0 -> "1 Hz"
+                            else -> if (hasGps) "LOCKED" else "SEARCH"
                         }
 
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(9.dp)
                                 .clip(CircleShape)
                                 .background(fixColor)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = fixText,
                             color = fixColor,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (gpsFix == 1) "• Real Fix" else if (gpsFix == 0) "• Spline Log" else "• OBD Stream",
-                            color = TextMuted,
-                            fontSize = 10.sp
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "HEADING: ${formatBearing(bearing)}",
+                            text = "• ${formatBearing(bearing)}",
                             color = TextSecondary,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         IconButton(
-                            onClick = { viewModel.fetchGpsRouteAndSummary() },
+                            onClick = { viewModel.refreshMapTrail() },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh GPS Route",
+                                contentDescription = "Refresh",
                                 tint = CockpitSteel,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        // Collapsible Icon Toggle (Pure icon, zero risk of vertical wrap)
                         Surface(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(26.dp)
                                 .clickable { isTelemetryExpanded.value = !isTelemetryExpanded.value },
                             shape = CircleShape,
                             color = if (isTelemetryExpanded.value) CockpitSteel.copy(alpha = 0.25f) else CockpitCardElevated,
@@ -552,9 +553,9 @@ fun TripMapScreen(
                             ) {
                                 Icon(
                                     imageVector = if (isTelemetryExpanded.value) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = if (isTelemetryExpanded.value) "Collapse Telemetry" else "Expand Telemetry",
+                                    contentDescription = "Expand/Collapse",
                                     tint = if (isTelemetryExpanded.value) TextPrimary else TextSecondary,
-                                    modifier = Modifier.size(15.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                             }
                         }
@@ -572,7 +573,7 @@ fun TripMapScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "📍 $latStr, $lonStr • ⛰ $elevDisplay • ⚡ $speedDisplay",
+                            text = "GPS: $latStr, $lonStr | Elev: $elevDisplay | Spd: $speedDisplay",
                             color = TextMuted,
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
@@ -853,9 +854,19 @@ fun TripMapScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
-                            Text(
-                                text = mode.icon,
-                                fontSize = 12.sp
+                            val modeIcon = when (mode) {
+                                TripMapMode.ROUTE -> Icons.Default.Route
+                                TripMapMode.FUEL -> Icons.Default.Thermostat
+                                TripMapMode.BUNKS -> Icons.Default.LocalGasStation
+                                TripMapMode.SPEED -> Icons.Default.Speed
+                                TripMapMode.BEHAVIOUR -> Icons.Default.Explore
+                                TripMapMode.ANOMALY -> Icons.Default.Warning
+                            }
+                            Icon(
+                                imageVector = modeIcon,
+                                contentDescription = mode.label,
+                                tint = if (isSelected) Color.White else TextSecondary,
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 text = mode.label,
@@ -1267,7 +1278,12 @@ fun TripMapScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(text = "⚠️", fontSize = 12.sp)
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Warning",
+                                    tint = Color(0xFFEAB308),
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
                                     text = "Refuel at one of the ${reachableBunks.size} stations listed below before reaching the outer range circumference on the map. Stations marked 'Out of Range' cannot be reached on remaining fuel.",
                                     color = TextSecondary,
@@ -1434,10 +1450,62 @@ fun TripMapScreen(
         }
 
         // =========================================================================
-        // Aggregated Trip Statistics Card (from GET /api/trip-summary)
-        // Untouched and preserved exactly as original
+        // Aggregated Trip Statistics Card (Dynamic from tripTickBuffer)
         // =========================================================================
-        val stats = tripSummary?.tripStats
+        val liveTripStats = remember(tripTickBuffer, tripDist, tripSummary) {
+            val baseStats = tripSummary?.tripStats
+            if (tripTickBuffer.isNotEmpty()) {
+                val vssList = tripTickBuffer.map { it.vss }
+                val rpmList = tripTickBuffer.map { it.rpm }
+                val throtList = tripTickBuffer.map { it.throttlePos }
+                com.example.model.TripStats(
+                    avgRpm = if (rpmList.isNotEmpty()) rpmList.average() else (baseStats?.avgRpm ?: 0.0),
+                    maxRpm = if (rpmList.isNotEmpty()) rpmList.maxOrNull() ?: 0.0 else (baseStats?.maxRpm ?: 0.0),
+                    avgSpeedKmh = if (vssList.isNotEmpty()) vssList.average() else (baseStats?.avgSpeedKmh ?: 0.0),
+                    maxSpeedKmh = if (vssList.isNotEmpty()) vssList.maxOrNull() ?: 0.0 else (baseStats?.maxSpeedKmh ?: 0.0),
+                    avgThrottle = if (throtList.isNotEmpty()) throtList.average() else (baseStats?.avgThrottle ?: 0.0),
+                    distanceKm = tripDist,
+                    gpsPoints = tripTickBuffer.size
+                )
+            } else {
+                baseStats ?: com.example.model.TripStats(distanceKm = tripDist, gpsPoints = routeData?.pointCount ?: 0)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { viewModel.saveCurrentTripSnapshot() },
+                shape = RoundedCornerShape(8.dp),
+                color = CockpitCardElevated,
+                border = BorderStroke(1.dp, CockpitSurfaceBorder)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = "Save Trip",
+                        tint = CockpitGreen,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = "Save Trip Snapshot",
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(8.dp),
@@ -1468,20 +1536,18 @@ fun TripMapScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    if (tripSummary?.hasGps == true) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = CockpitGreen.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, CockpitGreen.copy(alpha = 0.4f))
-                        ) {
-                            Text(
-                                text = "GPS-ENRICHED",
-                                color = CockpitGreen,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = CockpitGreen.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, CockpitGreen.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = "LIVE DYNAMIC",
+                            color = CockpitGreen,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
 
@@ -1491,13 +1557,13 @@ fun TripMapScreen(
                 ) {
                     TripStatItem(
                         label = "DISTANCE",
-                        value = "${String.format(Locale.US, "%.2f", stats?.distanceKm ?: tripDist)} km",
+                        value = "${String.format(Locale.US, "%.2f", liveTripStats.distanceKm ?: tripDist)} km",
                         subtext = "Total Tracked",
                         modifier = Modifier.weight(1f)
                     )
                     TripStatItem(
                         label = "GPS POINTS",
-                        value = "${stats?.gpsPoints ?: routeData?.pointCount ?: 0}",
+                        value = "${liveTripStats.gpsPoints ?: routeData?.pointCount ?: 0}",
                         subtext = "Logged Pings",
                         modifier = Modifier.weight(1f)
                     )
@@ -1509,13 +1575,13 @@ fun TripMapScreen(
                 ) {
                     TripStatItem(
                         label = "AVG SPEED",
-                        value = "${String.format(Locale.US, "%.1f", stats?.avgSpeedKmh ?: 0.0)} km/h",
+                        value = "${String.format(Locale.US, "%.1f", liveTripStats.avgSpeedKmh)} km/h",
                         subtext = "Driving Average",
                         modifier = Modifier.weight(1f)
                     )
                     TripStatItem(
                         label = "MAX SPEED",
-                        value = "${String.format(Locale.US, "%.1f", stats?.maxSpeedKmh ?: 0.0)} km/h",
+                        value = "${String.format(Locale.US, "%.1f", liveTripStats.maxSpeedKmh)} km/h",
                         subtext = "Peak Velocity",
                         modifier = Modifier.weight(1f)
                     )
@@ -1527,13 +1593,13 @@ fun TripMapScreen(
                 ) {
                     TripStatItem(
                         label = "AVG THROTTLE",
-                        value = "${String.format(Locale.US, "%.1f", stats?.avgThrottle ?: 0.0)} %",
+                        value = "${String.format(Locale.US, "%.1f", liveTripStats.avgThrottle)} %",
                         subtext = "Pedal Position",
                         modifier = Modifier.weight(1f)
                     )
                     TripStatItem(
                         label = "AVG / MAX RPM",
-                        value = "${(stats?.avgRpm ?: 0.0).toInt()} / ${(stats?.maxRpm ?: 0.0).toInt()}",
+                        value = "${liveTripStats.avgRpm.toInt()} / ${liveTripStats.maxRpm.toInt()}",
                         subtext = "Crankshaft Revs",
                         modifier = Modifier.weight(1f)
                     )
